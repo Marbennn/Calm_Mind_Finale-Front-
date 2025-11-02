@@ -1,15 +1,12 @@
-// src/pages/ChatBot.jsx
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo, useContext } from "react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
 import Sidebar from "../components/Sidebar";
 import api from "../api/client";
 import useStressStore from "../store/useStressStore";
-import {
-  calculateDailyStress,
-  buildChatbotReply,
-} from "../utils/stressUtils";
+import { calculateDailyStress, buildChatbotReply } from "../utils/stressUtils";
+import { ThemeContext } from "../context/ThemeContext";
 
 /* ======================== Constants ======================== */
 const LS_MSGS = "cm_messages_v1"; // legacy single-thread key (still read once)
@@ -18,14 +15,9 @@ const USER_ID = "69008a1fd3c8660f1ff28779";
 
 /* ======================== AI Response Engine ======================== */
 async function getBotResponse(userInput, currentTasks) {
-  // Build light context from currentTasks (used for fallbacks and chat hints)
   const daily = calculateDailyStress(currentTasks || []);
   const percent = Math.round(daily.percent || 0);
-  // counts available if needed later
-  // const due48hCount = (currentTasks || []).filter((t) => !t.completed && t.due_date && new Date(t.due_date) < new Date(Date.now() + 48 * 3600 * 1000) && new Date(t.due_date) >= new Date()).length;
-  // const overdueCount = (currentTasks || []).filter((t) => !t.completed && t.due_date && new Date(t.due_date) < new Date()).length;
 
-  // Context-focused queries: prefer structured, data-driven reply
   const askContext = /how stressed am i|reminders|what tasks do i have|summary|overview|due|overdue|next deadlines/i.test(
     userInput
   );
@@ -33,16 +25,16 @@ async function getBotResponse(userInput, currentTasks) {
     try {
       const { data } = await api.get(`/coach/context?user_id=${USER_ID}`);
       const ctx = data || {};
-      const pctFromCtx = Number.isFinite(+ctx.stress?.percentage) ? Math.round(+ctx.stress.percentage) : percent;
+      const pctFromCtx = Number.isFinite(+ctx.stress?.percentage)
+        ? Math.round(+ctx.stress.percentage)
+        : percent;
       const reply = buildChatbotReply(currentTasks || [], daily);
       return `📊 Current Stress: ${pctFromCtx}%.\n${reply}`;
     } catch {
-      // Fall back to data-driven local reply
       return buildChatbotReply(currentTasks || [], daily);
     }
   }
 
-  // Generic chat: send to coach LLM but include a data-driven fallback
   try {
     const { data } = await api.post("/coach/chat", {
       user_id: USER_ID,
@@ -52,20 +44,22 @@ async function getBotResponse(userInput, currentTasks) {
     let replyText = coachData.response || coachData.response?.response || "";
     let stepsText = "";
     if (Array.isArray(coachData.steps) && coachData.steps.length) {
-      stepsText = "\n\nSteps:\n" + coachData.steps.slice(0, 5).map((s) => `- ${s}`).join("\n");
+      stepsText =
+        "\n\nSteps:\n" + coachData.steps.slice(0, 5).map((s) => `- ${s}`).join("\n");
     }
     if (!replyText || !replyText.trim()) {
       return buildChatbotReply(currentTasks || [], daily);
     }
     return `📊 Current Stress: ${percent}%.\n${replyText}${stepsText}`;
   } catch {
-    // Robust local fallback if LLM endpoint errors
     return buildChatbotReply(currentTasks || [], daily);
   }
 }
 
 /* ======================== Main Component ======================== */
 export default function ChatBot() {
+  const { theme, setTheme } = useContext(ThemeContext);
+
   /* ---------- Tasks & analytics from centralized store ---------- */
   const {
     tasks,
@@ -75,35 +69,74 @@ export default function ChatBot() {
     getMostStressfulTasks,
   } = useStressStore();
 
-  // Add ref to track last daily stress
   const lastStressRef = useRef(null);
   const [liveBanner, setLiveBanner] = useState(null);
 
   useEffect(() => {
-    // ensure store has tasks
     fetchTasks();
     const interval = setInterval(fetchTasks, 30000);
     return () => clearInterval(interval);
   }, [fetchTasks]);
 
-  // Listen for store stress updates (custom event dispatched by store)
   useEffect(() => {
     const onStressUpdated = (e) => {
       const d = e?.detail;
       if (d && typeof d.averageStress === "number") {
         lastStressRef.current = d.averageStress;
-        setLiveBanner(`Live stress: ${Math.round(d.averageStress * 100)}% • updated just now`);
+        setLiveBanner(
+          `Live stress: ${Math.round(d.averageStress * 100)}% • updated just now`
+        );
       }
     };
     window.addEventListener("stress-updated", onStressUpdated);
     return () => window.removeEventListener("stress-updated", onStressUpdated);
   }, []);
 
+  /* ---------------------- Notifications ---------------------- */
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+  const fetchNotifications = async () => {
+    try {
+      setLoadingNotifs(true);
+      const res = await api.get("/notifications");
+      setNotifications(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    } finally {
+      setLoadingNotifs(false);
+    }
+  };
+
+  const markNotificationAsRead = async (id) => {
+    try {
+      await api.put(`/notifications/${id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === id ? { ...n, read: true } : n))
+      );
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const id = setInterval(fetchNotifications, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications]
+  );
+
   /* ---------- Chat Threads (localStorage) ---------- */
   const defaultGreetingMsg = () => ({
     id: `greet-${Date.now()}`,
     role: "assistant",
-    text: "Hi! I’m your CalmMind Stress AI Coach. Ask me about your tasks, stress levels, or how to reduce stress.",
+    text:
+      "Hi! I’m your CalmMind Stress AI Coach. Ask me about your tasks, stress levels, or how to reduce stress.",
     ts: new Date().toISOString(),
   });
 
@@ -116,9 +149,7 @@ export default function ChatBot() {
   });
 
   const deriveTitle = (text) => {
-    const clean = String(text || "")
-      .replace(/\s+/g, " ")
-      .trim();
+    const clean = String(text || "").replace(/\s+/g, " ").trim();
     if (!clean) return "Untitled";
     const words = clean.split(" ").slice(0, 8).join(" ");
     return words.charAt(0).toUpperCase() + words.slice(1);
@@ -127,7 +158,6 @@ export default function ChatBot() {
     !t || ["New chat", "Welcome", "Imported chat", "Untitled"].includes(t);
 
   const [threads, setThreads] = useState(() => {
-    // migrate from legacy LS_MSGS once
     const savedThreads = localStorage.getItem(LS_THREADS);
     if (savedThreads) return JSON.parse(savedThreads);
     const legacy = localStorage.getItem(LS_MSGS);
@@ -149,6 +179,10 @@ export default function ChatBot() {
   const listRef = useRef(null);
   const [note, setNote] = useState("");
 
+  // Panels state
+  const [isThreadsOpen, setIsThreadsOpen] = useState(true);    // mobile drawer
+  const [isThreadsVisible, setIsThreadsVisible] = useState(true); // desktop show/hide
+
   // New Chat / Delete History
   const handleNewChat = () => {
     const t = createThread("New chat");
@@ -160,8 +194,8 @@ export default function ChatBot() {
     setCurrentId(t.id);
     setMessages(t.messages);
   };
+
   const handleDeleteHistory = () => {
-    // Delete current thread
     setThreads((prev) => {
       const list = prev.filter((t) => t.id !== currentThread?.id);
       const final = list.length ? list : [createThread("Welcome")];
@@ -173,7 +207,7 @@ export default function ChatBot() {
     });
   };
 
-  // Persist: keep current thread messages in threads and save all
+  // Persist current thread
   useEffect(() => {
     setThreads((prev) => {
       const list = prev.map((t) =>
@@ -186,15 +220,15 @@ export default function ChatBot() {
     });
   }, [messages, currentThread?.id]);
 
-  // When switching current thread id, sync messages
+  // Sync messages on thread change
   useEffect(() => {
     if (!currentThread) return;
     setMessages(currentThread.messages);
   }, [currentThread?.id]);
 
+  // Auto-scroll chat
   useEffect(() => {
-    if (listRef.current)
-      listRef.current.scrollTop = listRef.current.scrollHeight;
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, sending]);
 
   const pushMessage = (role, text) =>
@@ -206,7 +240,6 @@ export default function ChatBot() {
   /* ---------- Command processor (quick local commands) ---------- */
   const processCommand = async (text) => {
     const t = text.trim();
-    // mark task N as complete
     const m1 = t.match(/mark task (\d+) as complete/i);
     if (m1) {
       const idx = parseInt(m1[1], 10) - 1;
@@ -217,11 +250,10 @@ export default function ChatBot() {
         return true;
       }
       await updateTask(target.id || target._id, { status: "completed" });
-  pushMessage("assistant", `Marked "${target.title}" as complete. Nice work!`);
+      pushMessage("assistant", `Marked "${target.title}" as complete. Nice work!`);
       return true;
     }
 
-    // complete by id: "complete TASK_ID"
     const m2 = t.match(/(?:complete|mark) ([\w-]{6,})/i);
     if (m2) {
       const id = m2[1];
@@ -231,14 +263,15 @@ export default function ChatBot() {
         return true;
       }
       await updateTask(found.id || found._id, { status: "completed" });
-  pushMessage("assistant", `Marked "${found.title}" as complete.`);
+      pushMessage("assistant", `Marked "${found.title}" as complete.`);
       return true;
     }
 
-    // show due today
     if (/due today|what's due today|show me what's due today/i.test(t)) {
       const todayIso = dayjs().format("YYYY-MM-DD");
-      const due = tasks.filter((x) => x.due_date && x.due_date.startsWith(todayIso) && !x.completed);
+      const due = tasks.filter(
+        (x) => x.due_date && x.due_date.startsWith(todayIso) && !x.completed
+      );
       if (!due.length) {
         pushMessage("assistant", "You have no tasks due today.");
       } else {
@@ -248,32 +281,35 @@ export default function ChatBot() {
       return true;
     }
 
-    // list overdue
     if (/overdue tasks|list my overdue tasks|show overdue/i.test(t)) {
       const now = new Date();
-      const overdue = tasks.filter((x) => !x.completed && x.due_date && new Date(x.due_date) < now);
+      const overdue = tasks.filter(
+        (x) => !x.completed && x.due_date && new Date(x.due_date) < now
+      );
       if (!overdue.length) {
         pushMessage("assistant", "No overdue tasks — nice!");
       } else {
-        const list = overdue.map((d, i) => `${i + 1}. ${d.title} — due ${dayjs(d.due_date).fromNow()}`).join("\n");
+        const list = overdue
+          .map((d, i) => `${i + 1}. ${d.title} — due ${dayjs(d.due_date).fromNow()}`)
+          .join("\n");
         pushMessage("assistant", `Overdue tasks:\n${list}`);
       }
       return true;
     }
 
-    // top stressors
     if (/most stress|top stressors|causing me the most stress/i.test(t)) {
       const top = getMostStressfulTasks ? getMostStressfulTasks(5) : [];
       if (!top.length) {
         pushMessage("assistant", "I can't find any stressful tasks right now.");
       } else {
-        const list = top.map((x, i) => `${i + 1}. ${x.title} — ${Math.round((x.stress || 0) * 100)}%`).join("\n");
+        const list = top
+          .map((x, i) => `${i + 1}. ${x.title} — ${Math.round((x.stress || 0) * 100)}%`)
+          .join("\n");
         pushMessage("assistant", `Top stressors:\n${list}`);
       }
       return true;
     }
 
-    // suggestion: what to do first
     if (/what should i do first|what should I do first|what to do first/i.test(t)) {
       const top = getMostStressfulTasks ? getMostStressfulTasks(1) : [];
       if (!top.length) {
@@ -281,7 +317,12 @@ export default function ChatBot() {
       } else {
         const s = top[0];
         const due = s.due_date ? `due ${dayjs(s.due_date).fromNow()}` : "no deadline";
-  pushMessage("assistant", `Focus on "${s.title}" — ${s.priority} priority, ${due}. Stress: ${Math.round((s.stress||0)*100)}%`);
+        pushMessage(
+          "assistant",
+          `Focus on "${s.title}" — ${s.priority} priority, ${due}. Stress: ${Math.round(
+            (s.stress || 0) * 100
+          )}%`
+        );
       }
       return true;
     }
@@ -292,15 +333,11 @@ export default function ChatBot() {
   const handleSend = async () => {
     const trimmed = note.trim();
     if (!trimmed || sending) return;
-    // If this is the first user input or title is default, auto-title the thread
+
     setThreads((prev) =>
       prev.map((t) =>
         t.id === currentId && isDefaultTitle(t.title)
-          ? {
-              ...t,
-              title: deriveTitle(trimmed),
-              updatedAt: new Date().toISOString(),
-            }
+          ? { ...t, title: deriveTitle(trimmed), updatedAt: new Date().toISOString() }
           : t
       )
     );
@@ -309,17 +346,17 @@ export default function ChatBot() {
     setSending(true);
 
     try {
-      // First, try to handle local quick-commands that operate on tasks
       const handled = await processCommand(trimmed);
       if (handled) {
         setSending(false);
         return;
       }
 
-      // Calculate real-time stress delta using lastStressRef (which is fed by store events)
-      const live = typeof lastStressRef.current === "number" ? lastStressRef.current : getDailyStressSummary().average;
+      const live =
+        typeof lastStressRef.current === "number"
+          ? lastStressRef.current
+          : getDailyStressSummary().average;
       const response = await getBotResponse(trimmed, tasks);
-      // After getting response, recompute and compare
       const after = getDailyStressSummary().average;
       let finalResp = response;
       if (typeof live === "number" && typeof after === "number") {
@@ -342,9 +379,13 @@ export default function ChatBot() {
 
   /* ---------- Mini-dashboard data & quick actions ---------- */
   const dashboard = useMemo(() => {
-    const daily = getDailyStressSummary ? getDailyStressSummary() : { average: 0, normalized: 0, total: 0 };
+    const daily = getDailyStressSummary
+      ? getDailyStressSummary()
+      : { average: 0, normalized: 0, total: 0 };
     const total = (tasks || []).length;
-    const overdue = (tasks || []).filter((x) => !x.completed && x.due_date && new Date(x.due_date) < new Date()).length;
+    const overdue = (tasks || []).filter(
+      (x) => !x.completed && x.due_date && new Date(x.due_date) < new Date()
+    ).length;
     const top = getMostStressfulTasks ? getMostStressfulTasks(3) : [];
     return { daily, total, overdue, top };
   }, [tasks, getDailyStressSummary, getMostStressfulTasks]);
@@ -361,106 +402,156 @@ export default function ChatBot() {
 
   /* ======================== UI ======================== */
   return (
-    <div className="min-h-screen h-screen flex">
-      <Sidebar active="Chat Bot" />
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Header */}
-        <div className="flex-shrink-0 h-[68px] w-full bg-card/50 border-b border-gray-200 px-4 flex items-center justify-between">
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-            Chatbot
-          </h1>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleNewChat}
-              className="px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-            >
-              New Chat
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteHistory}
-              className="px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-            >
-              Delete History
-            </button>
-          </div>
-        </div>
+    // Lock the viewport: only inner areas can scroll
+    <div className="h-screen overflow-hidden">
+      <div className="h-full w-full flex">
+        <Sidebar active="Chat Bot" />
+        <div className="flex-1 flex flex-col min-h-0 px-2 pt-2">
+          {/* Header */}
+          <div className="h-20 md:h-[80px] w-full px-4 flex items-center justify-between bg-card rounded-xl shadow-md cursor-default">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Chatbot</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Mobile: open conversations drawer */}
+              <button
+                className="block lg:hidden relative h-12 w-12 grid place-items-center rounded-full bg-card border border-gray-200 shadow-sm"
+                onClick={() => setIsThreadsOpen(true)}
+                aria-label="Open conversations"
+              >
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M3 5h18M3 12h18M3 19h18" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
 
-        {/* Main */}
-        <main className="flex-1 min-h-0 flex">
-          <div className="flex-1 flex">
-            {/* LEFT: Chat Section */}
-            <aside className="w-64 hidden lg:block border-r border-gray-200 bg-white p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-semibold">Conversations</div>
-                <span className="text-xs text-gray-500">{threads.length}</span>
-              </div>
-              <div className="space-y-1 overflow-y-auto max-h-[calc(100vh-180px)]">
-                {threads.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setCurrentId(t.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg border ${
-                      t.id === currentId
-                        ? "border-amber-300 bg-amber-50"
-                        : "border-transparent hover:bg-gray-50"
-                    }`}
+              {/* Notifications */}
+              <div className="relative">
+                <button
+                  className="relative h-12 w-12 grid place-items-center rounded-full bg-card border border-gray-200 shadow-sm"
+                  onClick={() => {
+                    setIsNotifOpen((prev) => !prev);
+                    fetchNotifications();
+                  }}
+                  aria-label="Toggle notifications"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
                   >
-                    <div className="truncate text-sm font-medium">
-                      {t.title || "Untitled"}
-                    </div>
-                    <div className="truncate text-[11px] text-gray-500">
-                      {dayjs(t.updatedAt).fromNow()}
-                    </div>
-                  </button>
-                ))}
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 text-xs text-white flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {isNotifOpen && (
+                  <div className="absolute right-0 top-14 w-80 bg-card rounded-xl shadow-xl overflow-hidden z-50 max-h-96">
+                    {loadingNotifs ? (
+                      <p className="p-4 text-gray-500 text-sm">Loading notifications...</p>
+                    ) : notifications.length === 0 ? (
+                      <p className="p-4 text-gray-500 text-sm">You have no notifications.</p>
+                    ) : (
+                      <ul className="overflow-y-auto max-h-80">
+                        {notifications.map((n) => (
+                          <li
+                            key={n._id}
+                            className={`p-4 border-b border-gray-100 last:border-0 ${
+                              n.read ? "bg-white text-gray-600" : "bg-yellow-50 text-gray-800"
+                            }`}
+                          >
+                            <div className="flex justify-between items-start gap-4">
+                              <div className="flex-1">
+                                <div className="font-medium text-sm">{n.message}</div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  {new Date(n.created_at).toLocaleString()}
+                                </div>
+                              </div>
+                              {!n.read && (
+                                <button
+                                  onClick={() => markNotificationAsRead(n._id)}
+                                  className="text-xs text-accent hover:underline whitespace-nowrap"
+                                >
+                                  Mark read
+                                </button>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
-            </aside>
-            <section className="flex-1 flex flex-col gap-3 p-2">
+
+              <button
+                className="h-12 w-12 grid place-items-center rounded-full bg-card border border-gray-200 shadow-sm"
+                aria-label="Account"
+              >
+                <span className="text-base">👤</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Main */}
+          <main className="flex-1 min-h-0 flex">
+            {/* Chat (left column) */}
+            <section className="flex-1 flex flex-col min-h-0">
               {liveBanner && (
-                <div className="mx-2 mb-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2">
+                <div className="mx-4 mt-4 rounded-xl bg-gray-100 border-gray-500 text-black text-sm px-4 py-2 shadow-sm">
                   {liveBanner}
                 </div>
               )}
-              {/* Chat */}
-              <div className="w-full rounded-2xl bg-[#F3EFE0] border border-gray-200 flex-1 relative flex flex-col overflow-x-hidden">
-                <div
-                  ref={listRef}
-                  className="flex-1 overflow-y-auto px-4 py-4 overflow-x-hidden"
-                >
-                  <div className="max-w-3xl mx-auto">
+
+              {/* Chat area (only this scrolls) */}
+              <div className="flex-1 relative flex flex-col overflow-hidden bg-gray-50 min-h-0">
+                <div ref={listRef} className="flex-1 overflow-y-auto px-6 py-6">
+                  <div className="max-w-4xl mx-auto space-y-6">
                     {messages.map((m) => (
                       <div
                         key={m.id}
-                        className={`mb-3 flex ${
+                        className={`flex items-start gap-3 ${
                           m.role === "user" ? "justify-end" : "justify-start"
                         }`}
                       >
+                        
                         <div
-                          className={`rounded-2xl px-4 py-3 text-sm leading-relaxed max-w-[78%] shadow-sm ${
+                          className={`rounded-xl p-4 text-base leading-relaxed max-w-xl shadow-md ${
                             m.role === "user"
-                              ? "bg-[#1F1F1D] text-white"
-                              : "bg-white text-[#111] border border-gray-200"
+                              ? "bg-black text-white"
+                              : "bg-white text-gray-900 border border-gray-100"
                           }`}
-                          style={{
-                            boxShadow:
-                              m.role === "user"
-                                ? "0 8px 22px rgba(0,0,0,0.12)"
-                                : "0 6px 12px rgba(0,0,0,0.06)",
-                          }}
                         >
-                          {m.text}
-                          <div className="mt-2 text-[11px] opacity-60">
+                          {m.text.split("\n").map((line, i) => (
+                            <p key={i} className={i > 0 ? "mt-3" : ""}>
+                              {line}
+                            </p>
+                          ))}
+                          <div className="mt-3 text-xs opacity-50 text-right">
                             {dayjs(m.ts).format("h:mm A")}
                           </div>
                         </div>
+                        
                       </div>
                     ))}
                     {sending && (
-                      <div className="mb-3 flex justify-start">
-                        <div className="rounded-2xl px-4 py-3 text-sm bg-white border border-gray-200 shadow-sm">
-                          Typing…
+                      <div className="flex items-start gap-3 justify-start">
+                        <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center text-2xl flex-shrink-0">
+                          🤖
+                        </div>
+                        <div className="rounded-xl p-4 text-base bg-white border border-gray-100 shadow-md animate-pulse">
+                          Typing...
                         </div>
                       </div>
                     )}
@@ -468,21 +559,16 @@ export default function ChatBot() {
                 </div>
               </div>
 
-              {/* Chat Input */}
-              <div
-                className="rounded-2xl bg-white border border-gray-100 p-5"
-                style={{ boxShadow: "0 6px 18px rgba(11,18,40,0.04)" }}
-              >
+              {/* Chat Input (doesn't trigger page scroll) */}
+              <div className="bg-white border-t border-gray-100 p-6 shadow-lg">
                 <div className="mb-4">
-                  <div className="text-lg font-bold">Chat with your Coach</div>
-                  <div className="text-xs text-gray-500">
-                    Type below to chat (Enter).
+                  <div className="text-lg font-bold text-gray-800">Chat with your Coach</div>
+                  <div className="text-sm text-gray-500">
+                    Type your message below and press Enter to send.
                   </div>
                 </div>
-
-                {/* Input + Button */}
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
+                <div className="flex items-start gap-3">
+                  <textarea
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     onKeyDown={(e) => {
@@ -492,64 +578,209 @@ export default function ChatBot() {
                       }
                     }}
                     placeholder="Type your message..."
-                    className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                    className="flex-1 rounded-xl border border-gray-300 bg-white px-6 py-4 text-base focus:outline-none focus:ring-2 focus:ring-amber-300 transition-shadow resize-none overflow-auto max-h-40"
+                    rows={1}
                   />
+                  {/* Modern Send Button with Icon */}
                   <button
                     onClick={handleSend}
                     disabled={sending}
-                    className="px-4 py-3 rounded-xl bg-[#222322] text-white disabled:opacity-50"
-                    style={{ boxShadow: "0 8px 20px rgba(0,0,0,0.12)" }}
+                    title={sending ? "Sending…" : "Send message"}
+                    aria-label={sending ? "Sending" : "Send"}
+                    className={[
+                      "group relative inline-flex items-center justify-center gap-2",
+                      "px-4 py-4 rounded-xl font-semibold",
+                      "bg-gradient-to-r from-black to-black text-white",
+                      "shadow-2xl hover:shadow-3xl active:scale-[0.98]",
+                      "transition-all duration-200",
+                      "disabled:opacity-50 disabled:cursor-not-allowed",
+                    ].join(" ")}
                   >
-                    Send
+                    <span className="hidden sm:inline">
+                      {sending ? "Sending…" : "Send"}
+                    </span>
+                    {/* Paper plane icon */}
+                    <svg
+                      className={[
+                        "h-5 w-5 flex-shrink-0",
+                        sending ? "animate-pulse" : "transform -rotate-45 group-hover:translate-x-1"
+                      ].join(" ")}
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      {/* paper plane path */}
+                      <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                    </svg>
+                    {/* subtle glow on hover */}
+                    <span className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-20 transition-opacity bg-white" />
                   </button>
                 </div>
               </div>
             </section>
 
-            {/* RIGHT: Mini-dashboard */}
-            <aside className="w-72 hidden xl:block border-l border-gray-200 bg-white p-4">
-              <div className="text-sm font-semibold mb-2">Today</div>
-              <div className="mb-3">
-                <div className="text-xs text-gray-500">Estimated stress</div>
-                <div className="text-2xl font-bold">
-                  {(() => {
-                    const d = dashboard.daily || {};
-                    const pct = d.average != null ? Math.round(d.average * 100) : d.normalized ? Math.round((d.normalized / 5) * 100) : 0;
-                    return `${pct}%`;
-                  })()}
+            {/* Mobile overlay for drawer */}
+            {isThreadsOpen && (
+              <div
+                className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+                onClick={() => setIsThreadsOpen(false)}
+              />
+            )}
+
+            {/* Conversations (right column) */}
+            {isThreadsVisible ? (
+              <aside 
+                className={[
+                  "w-72 mt-4 pt-3 border-l border-gray-200 bg-white p-4 transition-transform duration-300 flex-shrink-0",
+                  // Mobile drawer from right
+                  isThreadsOpen
+                    ? "fixed right-0 top-0 h-full z-50 translate-x-0"
+                    : "fixed right-0 top-0 h-full z-50 translate-x-full",
+                  // Desktop: static right column
+                  "lg:static lg:h-auto lg:translate-x-0 lg:z-auto",
+                ].join(" ")}
+              >
+                {/* Mobile close (X) */}
+                <button
+                  className="absolute top-4 left-4 text-gray-500 hover:text-gray-700 lg:hidden"
+                  onClick={() => setIsThreadsOpen(false)}
+                  aria-label="Close conversations"
+                >
+                  <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-lg font-semibold">Conversations</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">{threads.length}</span>
+                    {/* Desktop hide chevron */}
+                    <button
+                      className="text-gray-500 hover:text-gray-700 hidden lg:inline-flex"
+                      onClick={() => setIsThreadsVisible(false)}
+                      aria-label="Hide conversations"
+                    >
+                      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500">~{(dashboard.daily && dashboard.daily.normalized) || 0}/5</div>
-              </div>
-              <div className="mb-3 text-sm">Tasks: {dashboard.total}</div>
-              <div className="mb-3 text-sm">Overdue: {dashboard.overdue}</div>
-              <div className="mb-3">
-                <div className="text-sm font-semibold">Top stressors</div>
-                {dashboard.top && dashboard.top.length ? (
-                  <ul className="mt-2 space-y-2 text-sm">
-                    {dashboard.top.map((t) => (
-                      <li key={t.id || t._id} className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <div className="truncate">{t.title}</div>
-                          <div className="text-xs text-gray-500">{t.due_date ? dayjs(t.due_date).format("MMM D") : "No due"}</div>
-                        </div>
-                        <div className="flex flex-col items-end ml-2">
-                          <button
-                            onClick={() => handleQuickComplete(t)}
-                            className="text-xs px-2 py-1 rounded bg-amber-50 border border-amber-200 text-amber-900"
-                          >
-                            Complete
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="text-xs text-gray-500 mt-2">No active stressors.</div>
-                )}
-              </div>
-            </aside>
-          </div>
-        </main>
+
+                <div className="flex gap-2 mb-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleNewChat();
+                      setIsThreadsOpen(false);
+                    }}
+                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
+                  >
+                    New Chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleDeleteHistory();
+                      setIsThreadsOpen(false);
+                    }}
+                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
+                  >
+                    Delete Chat
+                  </button>
+                </div>
+
+                {/* Keep conversations non-scrollable to satisfy "only chat scrolls" */}
+                <div className="space-y-2 overflow-hidden h-[calc(100vh-200px)] pr-2 lg:h-[calc(100vh-180px)]">
+                  {threads.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        setCurrentId(t.id);
+                        setIsThreadsOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
+                        t.id === currentId
+                          ? "bg-gray-200 border border-gray-300"
+                          : "hover:bg-gray-50 border border-transparent"
+                      }`}
+                    >
+                      <div className="truncate text-sm font-medium text-gray-800">
+                        {t.title || "Untitled"}
+                      </div>
+                      <div className="truncate text-xs text-gray-500 mt-1">
+                        {dayjs(t.updatedAt).fromNow()}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </aside>
+            ) : (
+              // Desktop show button (when hidden)
+              <button
+                className="hidden lg:flex fixed right-0 top-1/2 -translate-y-1/2 z-30 h-12 w-8 bg-white border border-gray-200 rounded-l-lg shadow-md items-center justify-center text-gray-500 hover:text-gray-700"
+                onClick={() => setIsThreadsVisible(true)}
+                aria-label="Show conversations"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </main>
+        </div>
+      </div>
+
+      {/* Mobile theme toggle */}
+      <div className="block lg:hidden fixed bottom-4 left-4 z-50">
+        <div
+          className={`theme-switch ${theme === "dark" ? "dark" : ""}`}
+          role="group"
+          aria-label="Theme toggle"
+        >
+          <button
+            type="button"
+            className="sun-button"
+            aria-pressed={theme === "light"}
+            aria-label="Switch to light mode"
+            onClick={() => setTheme("light")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setTheme("light");
+            }}
+          >
+            <svg viewBox="0 0 18 18" width="18" height="18" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" fill="currentColor" />
+              <g stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <path d="M12 2v2" />
+                <path d="M12 20v2" />
+                <path d="M4.93 4.93l1.41 1.41" />
+                <path d="M17.66 17.66l1.41 1.41" />
+                <path d="M2 12h2" />
+                <path d="M20 12h2" />
+                <path d="M4.93 19.07l1.41-1.41" />
+                <path d="M17.66 6.34l1.41-1.41" />
+              </g>
+            </svg>
+          </button>
+
+          <button type="button" className="knob-button" aria-hidden="true" tabIndex={-1} />
+
+          <button
+            type="button"
+            className="moon-button"
+            aria-pressed={theme === "dark"}
+            aria-label="Switch to dark mode"
+            onClick={() => setTheme("dark")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setTheme("dark");
+            }}
+          >
+            <svg className="moon moon-icon" viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );
