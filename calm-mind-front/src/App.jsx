@@ -22,6 +22,7 @@ import SettingsAbout from "./pages/SettingsAbout";
 import AdminHomepage from "./pages/admin/AdminHomepage";
 import { useAuthStore } from "./store/authStore";
 import api from "./api/client";
+import VerifyEmailScreen from "./pages/VerifyEmailScreen";
 
 const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
   const { token, logout } = useAuthStore();
@@ -253,6 +254,9 @@ function App() {
 
           {/* 404 Fallback */}
           <Route path="*" element={<NotFoundPage />} />
+          <Route path="/verify-email/:token" element={<VerifyEmailScreen />} />
+          <Route path="/admin-home" element={<AdminHomepage />} />
+
         </Routes>
       </Router>
     </ThemeProvider>

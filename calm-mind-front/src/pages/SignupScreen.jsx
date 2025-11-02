@@ -22,46 +22,47 @@ export default function SignupScreen() {
   const [imageAnimation, setImageAnimation] = useState("animate-swap-in-right");
 
   const handleChange = (e) => {
-    const { id, type, checked, value } = e.target;
+    const { id, value } = e.target;
     setForm((prev) => ({
       ...prev,
-      [id]: type === "checkbox" ? checked : value,
+      [id]: value,
     }));
   };
 
   const handleSignup = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match.");
+  if (form.password !== form.confirmPassword) {
+    setError("Passwords do not match.");
+    return;
+  }
+
+  try {
+    setError("");
+    setLoading(true);
+
+    const ok = await signup({
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      email: form.email.toLowerCase(),
+      password: form.password,
+    });
+
+    if (!ok) {
+      setError(storeError || "Registration failed.");
       return;
     }
 
-    try {
-      setError("");
-      setLoading(true);
+    alert("Registration successful! Please log in to continue.");
+    navigate(`/verify-email/${ok.token}`);
+  } catch (err) {
+    console.error("Signup error:", err);
+    setError("Registration failed.");
+  } finally {
+    setLoading(false);
+  }
+};
 
-      const ok = await signup({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        email: form.email.toLowerCase(),
-        password: form.password,
-      });
-
-      if (!ok) {
-        setError(storeError || "Registration failed.");
-        return;
-      }
-
-      alert("Registration successful! Please log in to continue.");
-      navigate("/login");
-    } catch (err) {
-      console.error("Signup error:", err);
-      setError("Registration failed.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoLogin = () => {
     setFormAnimation("animate-swap-out-right");
@@ -238,3 +239,4 @@ export default function SignupScreen() {
     </div>
   );
 }
+
