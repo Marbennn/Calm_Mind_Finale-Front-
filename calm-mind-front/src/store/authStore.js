@@ -11,13 +11,13 @@ export const useAuthStore = create(
       error: null,
 
       // -------------------- SIGNUP --------------------
-      signup: async (name, email, password) => {
+      signup: async ({ firstName, lastName, email, password }) => {
         try {
           set({ loading: true, error: null });
 
           const res = await api.post(
             "http://localhost:4000/api/users/register",
-            { name, email, password }
+            { firstName, lastName, email, password }
           );
 
           const { user, token } = res.data;
@@ -118,11 +118,9 @@ export const useAuthStore = create(
 
       // -------------------- LOGOUT --------------------
       logout: () => {
-        // ✅ Clear everything: Zustand + localStorage
         localStorage.removeItem("token");
         localStorage.removeItem("user");
 
-        // Clear persisted store as well
         const storage = get()._storage;
         if (storage?.removeItem) {
           storage.removeItem("auth-store");
@@ -134,7 +132,6 @@ export const useAuthStore = create(
     {
       name: "auth-store",
       onRehydrateStorage: () => (state) => {
-        // 🔄 When store rehydrates, sync with localStorage
         const storedToken = localStorage.getItem("token");
         const storedUser = localStorage.getItem("user");
         if (storedToken && storedUser) {

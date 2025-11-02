@@ -17,14 +17,11 @@ export default function LoginScreen() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      // ✅ login returns user object from the store
       const user = await login(email, password);
 
       if (user) {
-        // ✅ store userId in localStorage (needed by Settings.jsx)
         localStorage.setItem("userId", user.id);
 
-        // ✅ navigate based on profileCompleted
         if (user.profileCompleted) {
           navigate("/home");
         } else {
