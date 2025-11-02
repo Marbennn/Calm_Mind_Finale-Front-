@@ -15,23 +15,28 @@ export default function LoginScreen() {
   const { login, loading, error } = useAuthStore();
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    try {
-      const user = await login(email, password);
+  e.preventDefault();
+  try {
+    const user = await login(email, password);
 
-      if (user) {
-        localStorage.setItem("userId", user.id);
+    if (user) {
+      localStorage.setItem("userId", user.id);
 
-        if (user.profileCompleted) {
-          navigate("/home");
-        } else {
-          navigate("/get-started");
-        }
+      // Admins and superadmins go directly to AdminHomepage
+      if (user.role === "admin" || user.role === "superadmin") {
+        navigate("/admin-home");
+      } 
+      // Regular users
+      else if (user.profileCompleted) {
+        navigate("/home");
+      } else {
+        navigate("/get-started");
       }
-    } catch (err) {
-      console.error("Login error:", err);
     }
-  };
+  } catch (err) {
+    console.error("Login error:", err);
+  }
+};
 
   const handleGoSignup = () => {
     setFormAnimation("animate-swap-out-left");

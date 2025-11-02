@@ -1,5 +1,5 @@
 import React from "react";
-import { Pencil, Trash2, Calendar, Gauge, Tag as TagIcon } from "lucide-react";
+import { Pencil, Trash2, Calendar, Tag as TagIcon } from "lucide-react";
 import StatusDropdown from "./StatusDropdown";
 
 export default function TaskCard({
@@ -10,15 +10,12 @@ export default function TaskCard({
   onDelete,
   onStatusChange,
   completeTask, // (unused here but kept to avoid breaking signature)
-  // NEW (already existed in your code):
   stressPercent = 0,
   StressIndicator,
 }) {
   if (!task) return null;
 
   const eff = derivedStatus(task);
-  const canQuickActions =
-    eff === "todo" || eff === "in_progress" || eff === "missing";
 
   // Dates: support both camelCase and snake_case without altering upstream logic
   const rawStart = task.startDate || task.start_date;
@@ -32,15 +29,12 @@ export default function TaskCard({
     }
   };
 
-  // Stress visuals (kept purely presentational)
-  const stress = Math.max(0, Math.min(100, Number(stressPercent) || 0));
-  const stressTier = stress < 50 ? "Low" : stress < 75 ? "Medium" : "High";
-  const stressClass =
-    stress < 50
-      ? "bg-amber-100 text-amber-800"
-      : stress < 75
-      ? "bg-amber-200 text-amber-900"
-      : "bg-gray-900 text-amber-300";
+  // Stress visuals
+  // ✅ Force stress to 0% when task is done (completed or done_late)
+  const isDone = eff === "completed" || eff === "done_late";
+  const normalized = Math.max(0, Math.min(100, Number(stressPercent) || 0));
+  const stress = isDone ? 0 : normalized;
+
   const barClass =
     stress < 50 ? "bg-amber-300" : stress < 75 ? "bg-amber-500" : "bg-black";
   const ringColor = stress < 50 ? "#fde68a" : stress < 75 ? "#f59e0b" : "#111827";
@@ -77,14 +71,19 @@ export default function TaskCard({
     }
   };
 
+  const showFixedBadge =
+    eff === "missing" || eff === "done_late" || eff === "completed";
+
   return (
     <div
       className="group relative cursor-pointer rounded-xl border border-gray-200 bg-gradient-to-b from-white to-gray-50 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
       onClick={() => onClick(task)}
     >
-      {/* Stress ring (always visible). If a custom StressIndicator is provided, we still render it above the ring. */}
-      <div className="absolute top-3 right-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-        {/* Default ring */}
+      {/* Stress ring */}
+      <div
+        className="absolute top-3 right-3 flex items-center gap-2"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div
           className="h-9 w-9 rounded-full grid place-items-center"
           style={{
@@ -96,8 +95,6 @@ export default function TaskCard({
             {stress}%
           </div>
         </div>
-
-        {/* Optional external indicator (kept, won’t break anything) */}
         {StressIndicator && <StressIndicator percent={stress} />}
       </div>
 
@@ -169,7 +166,7 @@ export default function TaskCard({
         </div>
       )}
 
-      {/* Priority + Status + Stress tier */}
+      {/* Priority + Status (no duplicate "Overdue" for missing) */}
       <div className="mt-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span
@@ -184,35 +181,14 @@ export default function TaskCard({
           >
             {task.priority}
           </span>
-
-          {/* Stress tier label */}
-          <span
-            className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-full ${stressClass}`}
-            title={`Stress level: ${stressTier}`}
-          >
-            <Gauge size={12} />
-            {stressTier}
-          </span>
-
-          {/* Overdue flag if applicable */}
-          {eff === "missing" && (
-            <span className="px-2 py-1 text-[11px] rounded-full bg-red-100 text-red-800">
-              Overdue
-            </span>
-          )}
+          {/* no extra Overdue pill here */}
         </div>
 
         <div
           className="flex items-center gap-2"
           onClick={(e) => e.stopPropagation()}
         >
-          {eff !== "done_late" && eff !== "completed" ? (
-            <StatusDropdown
-              value={task.status}
-              onChange={(s) => onStatusChange(task.id, s)}
-              menuAlign="right"
-            />
-          ) : (
+          {showFixedBadge ? (
             <span
               className={`text-[11px] px-2 py-1 rounded-full ${getStatusColor(
                 eff
@@ -220,6 +196,12 @@ export default function TaskCard({
             >
               {getStatusLabel(eff)}
             </span>
+          ) : (
+            <StatusDropdown
+              value={task.status}
+              onChange={(s) => onStatusChange(task.id, s)}
+              menuAlign="right"
+            />
           )}
         </div>
       </div>

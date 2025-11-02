@@ -433,7 +433,7 @@ export default function ChatBot() {
     // Lock the viewport: only inner areas can scroll
     <div className="h-screen overflow-hidden">
       <div className="h-full w-full flex">
-        <Sidebar active="Chat Bot" />
+        <Sidebar active="ChatBot" />
         <div className="flex-1 flex flex-col min-h-0 px-2 pt-2">
           {/* Header */}
           <div className="h-20 md:h-[80px] w-full px-4 flex items-center justify-between bg-card rounded-xl shadow-md cursor-default">
@@ -537,7 +537,7 @@ export default function ChatBot() {
             {/* Chat (left column) */}
             <section className="flex-1 flex flex-col min-h-0">
               {liveBanner && (
-                <div className="mx-4 mt-4 rounded-xl bg-gray-100 border-gray-500 text-black text-sm px-4 py-2 shadow-sm">
+                <div className="mx-4 mt-4 rounded-xl bg-black  text-amber-400 text-sm px-4 py-2 shadow-sm">
                   {liveBanner}
                 </div>
               )}
@@ -557,7 +557,7 @@ export default function ChatBot() {
                         <div
                           className={`rounded-xl p-4 text-base leading-relaxed max-w-xl shadow-md ${
                             m.role === "user"
-                              ? "bg-black text-white"
+                              ? "bg-black text-amber-400"
                               : "bg-white text-gray-900 border border-gray-100"
                           }`}
                         >
@@ -618,7 +618,7 @@ export default function ChatBot() {
                     className={[
                       "group relative inline-flex items-center justify-center gap-2",
                       "px-4 py-4 rounded-xl font-semibold",
-                      "bg-gradient-to-r from-black to-black text-white",
+                      "bg-gradient-to-r from-black to-black text-amber-400",
                       "shadow-2xl hover:shadow-3xl active:scale-[0.98]",
                       "transition-all duration-200",
                       "disabled:opacity-50 disabled:cursor-not-allowed",
@@ -703,7 +703,7 @@ export default function ChatBot() {
                       handleNewChat();
                       setIsThreadsOpen(false);
                     }}
-                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
+                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-gray-200 bg-black text-amber-400 hover:bg-gray-800 shadow-sm"
                   >
                     New Chat
                   </button>
@@ -713,7 +713,7 @@ export default function ChatBot() {
                       handleDeleteHistory();
                       setIsThreadsOpen(false);
                     }}
-                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
+                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-gray-200 bg-black text-amber-400 hover:bg-gray-800 shadow-sm"
                   >
                     Delete Chat
                   </button>

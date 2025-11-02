@@ -22,44 +22,39 @@ export default function SignupScreen() {
   const [imageAnimation, setImageAnimation] = useState("animate-swap-in-right");
 
   const handleChange = (e) => {
-    const { id, type, checked, value } = e.target;
+    const { id, value } = e.target;
     setForm((prev) => ({
       ...prev,
-      [id]: type === "checkbox" ? checked : value,
+      [id]: value,
     }));
   };
 
   const handleSignup = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
+  if (form.password !== form.confirmPassword) {
+    setError("Passwords do not match.");
+    return;
+  }
 
-    try {
-      setError("");
-      setLoading(true);
+  try {
+    setError("");
+    setLoading(true);
 
-      const user = await signup({
+      const ok = await signup({
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.toLowerCase(),
         password: form.password,
       });
 
-      if (!user) {
+      if (!ok) {
         setError(storeError || "Registration failed.");
         return;
       }
 
-      // Persist userId for stores that load by userId
-      try {
-        const id = user?.id || user?._id;
-        if (id) localStorage.setItem("userId", id);
-      } catch {}
-
-      navigate("/home");
+      alert("Registration successful! Please log in to continue.");
+      navigate("/login");
     } catch (err) {
       console.error("Signup error:", err);
       setError("Registration failed.");
@@ -243,3 +238,4 @@ export default function SignupScreen() {
     </div>
   );
 }
+

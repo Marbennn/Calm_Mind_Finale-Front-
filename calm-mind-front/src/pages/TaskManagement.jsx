@@ -298,7 +298,7 @@ export default function TaskManagement() {
 
   return (
     <div className="min-h-screen h-screen flex overflow-hidden mb-4">
-      <Sidebar theme={theme} onToggleTheme={toggleTheme} active="Tasks" />
+      <Sidebar active="Task Management" />
 
       {/* hidden scrollbar utility + stop scroll chaining */}
       <style>{`
