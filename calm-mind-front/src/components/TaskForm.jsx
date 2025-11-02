@@ -165,6 +165,7 @@ export default function TaskForm({
           <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
             Start Date
           </label>
+            <p className="text-xs text-gray-400 mt-1">Select Start Date</p>
           <div className="mt-1.5">
             <input
               id="startDate"
@@ -183,6 +184,7 @@ export default function TaskForm({
           <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
             Due Date
           </label>
+            <p className="text-xs text-gray-400 mt-1">Select Due Date</p>
           <div className="mt-1.5">
             <input
               id="dueDate"

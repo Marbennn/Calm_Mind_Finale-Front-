@@ -54,6 +54,7 @@ export default function TaskManagement() {
     dueDate: "",
     tags: [],
   });
+  const [formError, setFormError] = useState("");
 
   /* ---------- Data Loading ---------- */
   useEffect(() => {
@@ -447,27 +448,59 @@ export default function TaskManagement() {
             <TaskForm
               data={formData}
               setData={setFormData}
+              error={formError}
               isEditing={!!editingTask}
               onSubmit={async () => {
+                // Client-side date validation: ensure due >= start
+                const hasStart = !!formData.startDate;
+                const hasDue = !!formData.dueDate;
+                if (hasStart && hasDue) {
+                  const s = new Date(formData.startDate);
+                  const d = new Date(formData.dueDate);
+                  if (!isFinite(s.getTime()) || !isFinite(d.getTime())) {
+                    setFormError("Please enter valid dates for Start and Due.");
+                    return;
+                  }
+                  if (d < s) {
+                    setFormError("Due Date cannot be earlier than Start Date.");
+                    return;
+                  }
+                }
+                // clear previous errors
+                setFormError("");
                 const eid = editingTaskId || formData.id || editingTask?.id || editingTask?._id;
                 if (eid) {
+                  // Ensure date fields are included and formatted as ISO strings when sent to the backend
+                  const toISO = (d) => {
+                    if (!d) return null;
+                    const parsed = new Date(d);
+                    return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+                  };
                   await updateTask(eid, {
                     title: formData.title,
                     description: formData.description,
                     priority: formData.priority,
                     status: formData.status,
-                    due_date: formData.dueDate,
+                    start_date: toISO(formData.startDate),
+                    due_date: toISO(formData.dueDate),
                     tags: formData.tags || [],
                   });
                   closeForm();
                   return;
                 }
+                // When creating a task also include start_date and format dates
+                const toISO = (d) => {
+                  if (!d) return null;
+                  const parsed = new Date(d);
+                  return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+                };
                 await createTask({
                   title: formData.title,
                   description: formData.description,
                   priority: formData.priority,
                   status: formData.status || "todo",
-                  due_date: formData.dueDate || new Date().toISOString(),
+                  start_date: toISO(formData.startDate),
+                  due_date: toISO(formData.dueDate) || new Date().toISOString(),
                   tags: formData.tags || [],
                 });
                 closeForm();
