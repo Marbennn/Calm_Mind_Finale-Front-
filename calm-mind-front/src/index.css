@@ -1,0 +1,68 @@
+@import "tailwindcss";
+@import "./styles/theme.css";
+
+
+@keyframes swapInRight {
+  0% {
+    transform: translateX(100%);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes swapOutLeft {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0.7;
+  }
+}
+
+@keyframes swapInLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes swapOutRight {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0.7;
+  }
+}
+
+.animate-swap-in-right {
+  animation: swapInRight 0.6s cubic-bezier(0.4, 0, 0.4, 1) forwards;
+}
+
+.animate-swap-out-left {
+  animation: swapOutLeft 0.6s cubic-bezier(0.4, 0, 0.4, 1) forwards;
+}
+
+.animate-swap-in-left {
+  animation: swapInLeft 0.6s cubic-bezier(0.4, 0, 0.4, 1) forwards;
+}
+
+.animate-swap-out-right {
+  animation: swapOutRight 0.6s cubic-bezier(0., 0, 0.4, 1) forwards;
+}
+
+/* e.g., in index.css */
+html, body, #root {
+  height: 100%;
+}

@@ -1,0 +1,1231 @@
+#root {
+  /* Allow the app to span the full viewport width with a small gutter */
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0; /* small horizontal gutter */
+  text-align: left;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* Theme variables (light + dark). These are tuned to the provided design. */
+:root {
+  /* Light theme */
+  --bg: #FCFCFC;        /* page background (cream) */
+  --card: #fffbfb;      /* card surfaces */
+  --card-light: #FFFFFF; /* explicit light surface for inverted panels */
+  --card-dark: #1F1F1D; /* dark card color used in dark mode */
+  --accent: #e7d341;    /* mustard accent */
+  --accent-on: #111111; /* text on accent */
+  --muted: #9CA3AF;     /* subdued secondary text */
+  --focus: rgba(214,195,59,0.25);
+}
+.cm-dark {
+  /* Dark theme */
+  --bg: #121212;
+  --text: #E6E6E6;
+  --card: #1F1F1D;
+  --accent: #e7d341;    /* keep brand accent consistent */
+  --accent-on: #0B2340;
+  --muted: #BDBDBD;
+  --focus: rgba(214,195,59,0.18);
+}
+
+/* Theme-driven utility classes (use variables so components follow light/dark) */
+.bg-card { background: var(--card) !important; transition: background-color 220ms linear, color 220ms linear; }
+.text-primary { color: var(--text) !important; transition: color 220ms linear; }
+.bg-accent { background: var(--accent) !important; }
+.text-accent { color: var(--accent) !important; }
+.on-accent { color: var(--accent-on) !important; }
+
+/* Focus and small helpers */
+.focus-accent:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.ring-accent { box-shadow: 0 0 0 4px var(--focus); }
+
+
+/* transient toast when toggling theme */
+.cm-theme-toast {
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  transform: translateY(-6px);
+  transition: opacity 250ms ease, transform 250ms ease;
+  opacity: 1;
+}
+.cm-theme-toast-hide { opacity: 0; transform: translateY(-18px); }
+
+/* Removed broad attribute-match dark-mode mappings to keep theme logic explicit.
+   Rationale: these selectors attempted to remap arbitrary hex utility classes and
+   caused ordering/specificity issues. Use explicit panel classes and theme vars
+   instead (panel-overall, panel-help, panel-time, panel-plan, panel-mood).
+*/
+
+/* Broad overrides so the page visibly flips to dark when .cm-dark is present */
+.cm-dark, .cm-dark body, .cm-dark .min-h-screen {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+.cm-dark .bg-white { background: var(--card) !important; }
+.cm-dark [class*="bg-[#F6F3E5]"], .cm-dark [class*="bg-[#F6F6F3]"], .cm-dark [class*="bg-[#F9F7E7]"] { background: var(--card) !important; }
+.cm-dark [class*="bg-[#1F1F1D]"], .cm-dark .text-white { color: var(--text) !important; }
+.cm-dark .text-gray-700, .cm-dark .text-gray-500, .cm-dark .text-gray-400 { color: var(--muted) !important; }
+.cm-dark .border-gray-200, .cm-dark .border-gray-100 { border-color: rgba(255,255,255,0.06) !important; }
+
+/* Invert specific dark-box elements when switching to dark mode so they become lighter
+   This targets elements that used bg-[#1F1F1D] (dark cards in light mode) and makes
+   them use a lighter surface and dark text in dark mode for better contrast. */
+.cm-dark [class*="bg-[#1F1F1D]"], .cm-dark [class*="bg-[#2A2A27]"] {
+  background: #EFEDE9 !important; /* light surface in dark mode for these boxes */
+  color: #0B2340 !important; /* dark text for readability */
+}
+.cm-dark [class*="bg-[#1F1F1D]"] svg, .cm-dark [class*="bg-[#2A2A27]"] svg {
+  color: #0B2340 !important;
+  stroke: #0B2340 !important;
+  fill: #0B2340 !important;
+}
+.cm-dark [class*="bg-[#1F1F1D]"] .text-white, .cm-dark [class*="bg-[#2A2A27]"] .text-white {
+  color: #0B2340 !important;
+}
+
+/* Make cards and buttons use card background in dark */
+.cm-dark .rounded-2xl, .cm-dark .rounded-xl, .cm-dark .shadow-sm, .cm-dark .shadow-md {
+  background-clip: padding-box;
+}
+
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* apply to cards that use bg-white directly in markup by adding a fallback class */
+.cm-dark .bg-white { background: var(--card) !important; }
+.cm-dark .text-gray-900 { color: var(--text) !important; }
+.cm-dark .text-gray-500 { color: #BDBDBD !important; }
+
+/* Removed broad "light-mode safety" overrides that masked explicit panel
+  rules. Panels should be controlled via panel-* classes and variables so
+  behavior is predictable in both light and dark modes. */
+
+/* Chart/bar specific: ensure small bars respect bg-accent and bg-card */
+:root :not(.cm-dark) .w-6.rounded-t.bg-accent { background: var(--accent) !important; }
+:root :not(.cm-dark) .w-6.rounded-t.bg-card { background: var(--card) !important; }
+
+/* Explicit theme colors for the four target boxes to match the design image */
+.panel-overall {
+  /* dark charcoal panel with mustard accents */
+  background: var(--card-dark) !important; /* deep charcoal (dark mode card color) */
+  color: #EDEDEB !important; /* light text on dark */
+  border-radius: 16px;
+}
+.panel-overall .text-accent, .panel-overall .text-accent * {
+  color: var(--accent) !important; /* mustard numbers and accents */
+}
+.panel-help {
+  /* keep the "Need Some Help" panel as a light/cream card to match the reference */
+  background: var(--card) !important; /* light card surface */
+  color: var(--text) !important;
+  border-radius: 16px;
+}
+.panel-time {
+  background: var(--card-dark) !important; /* same deep charcoal as overall */
+  color: #EDEDEB !important;
+  border-radius: 16px;
+}
+.panel-plan {
+  background: var(--card-dark) !important; /* small dark plan pills */
+  color: #EDEDEB !important;
+  border-radius: 12px;
+}
+
+/* Mood box (explicitly force dark in light mode as requested) */
+.panel-mood {
+  background: var(--card-dark) !important;
+  color: #EDEDEB !important;
+  border-radius: 16px;
+}
+
+/* Ensure buttons, small elements inside the dark panels use the right contrast */
+.panel-overall .bg-card, .panel-time .bg-card, .panel-plan .bg-card { background: #EFEFEF !important; color: #151515 !important; }
+.panel-overall .shadow-md, .panel-time .shadow-md { box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
+
+/* Task item icon: mustard circular background with contrasting pencil icon */
+.task-icon {
+  /* slightly reduce brightness/opacity so the pencil stroke is visible */
+  background: rgba(214,195,59,0.85) !important; /* softer mustard */
+  color: var(--accent-on) !important; /* icon color (uses currentColor) */
+  width: clamp(32px, 5vw, 44px);
+  height: clamp(32px, 5vw, 44px);
+  border-radius: 9999px !important;
+  display: inline-grid; place-items: center; box-shadow: 0 6px 14px rgba(0,0,0,0.06) !important;
+}
+.task-icon svg { stroke: var(--accent-on); fill: none; }
+
+/* Avatar positioned inside card (keeps it from overflowing when padding changes) */
+.avatar-abs {
+  position: absolute; top: 1rem; right: 1rem; z-index: 5; display: grid; place-items: center;
+}
+.avatar-abs.h-20.w-20 { width: 80px !important; height: 80px !important; }
+
+/* Make sure avatar stays inside reduced-padding cards on small screens */
+@media (max-width: 768px) {
+  .avatar-abs { top: 0.6rem; right: 0.6rem; transform: translate(0, 0); }
+  .avatar-abs.h-20.w-20 { width: clamp(56px, 10vw, 72px) !important; height: clamp(56px, 10vw, 72px) !important; }
+}
+
+/* Adjust the left sidebar active indicator so it doesn't sit outside the sidebar on small screens */
+.absolute.-left-4 { left: 0.25rem !important; }
+
+/* Time tracker action (top-right inside the panel) */
+.time-action {
+  position: absolute; top: 1rem; right: 1rem; z-index: 6;
+}
+.time-action.h-8.w-8 { width: 36px !important; height: 36px !important; }
+@media (max-width: 768px) {
+  .time-action { top: 0.6rem; right: 0.6rem; }
+  .time-action.h-8.w-8 { width: 32px !important; height: 32px !important; }
+}
+
+/* Dark mode adjustment: keep the icon visible while keeping the softer circle */
+html.cm-dark .task-icon { background: rgba(214,195,59,0.85) !important; color: var(--accent-on) !important; }
+
+/* Scoped pill under the overall stat - make it mustard without affecting other bg-accent usages */
+.overall-pill {
+  /* responsive pill that scales between small and large screens */
+  width: clamp(56px, 6.5vw, 120px);
+  height: clamp(6px, 0.7vw, 12px);
+  display: block; margin-top: 1rem; border-radius: 9999px;
+  background: var(--accent) !important; box-shadow: none !important; opacity: 1 !important;
+}
+
+/* Slightly reduce in dark mode if needed */
+html.cm-dark .overall-pill { background: rgba(214,195,59,0.95) !important; }
+
+/* Force the panel colors in light mode with high specificity so they're stable
+   even if other broad rules attempt to map rounded panels to card surfaces. */
+:root :not(.cm-dark) .panel-overall,
+:root :not(.cm-dark) .panel-time,
+:root :not(.cm-dark) .panel-plan,
+:root :not(.cm-dark) .panel-mood {
+  background: var(--card-dark) !important;
+  color: #EDEDEB !important;
+}
+:root :not(.cm-dark) .panel-overall.bg-card,
+:root :not(.cm-dark) .panel-time.bg-card,
+:root :not(.cm-dark) .panel-plan.bg-card,
+:root :not(.cm-dark) .panel-mood.bg-card {
+  /* If the panel also has the utility class bg-card on the same element,
+     ensure the panel background overrides the utility's background. */
+  background: var(--card-dark) !important;
+  color: #EDEDEB !important;
+}
+:root :not(.cm-dark) .panel-help {
+  background: var(--card) !important;
+  color: var(--text) !important;
+}
+:root :not(.cm-dark) .panel-overall .bg-card,
+:root :not(.cm-dark) .panel-time .bg-card,
+:root :not(.cm-dark) .panel-plan .bg-card {
+  background: #EFEFEF !important;
+  color: #151515 !important;
+}
+
+.cm-dark .panel-overall,
+.cm-dark .panel-time,
+.cm-dark .panel-plan,
+.cm-dark .panel-mood {
+  background: var(--card-light) !important; /* explicit light surface in dark mode */
+  /* Use a dark text color on these inverted white surfaces so icons/text stay visible */
+  color: var(--card-dark) !important;
+}
+.cm-dark .panel-overall.bg-card,
+.cm-dark .panel-time.bg-card,
+.cm-dark .panel-plan.bg-card,
+.cm-dark .panel-mood.bg-card {
+  /* Also handle when the same element has .bg-card; ensure panel light surface wins in dark mode */
+  background: var(--card) !important;
+  color: var(--text) !important;
+}
+.cm-dark .panel-overall .text-accent, .cm-dark .panel-overall .text-accent * {
+  color: var(--accent) !important;
+}
+.cm-dark .panel-overall .bg-card,
+.cm-dark .panel-time .bg-card,
+.cm-dark .panel-plan .bg-card {
+  background: var(--card-dark) !important; /* inner elements contrast with dark color */
+  color: #EDEDEB !important;
+}
+
+/* Responsive: collapse wide grid into single column on small screens */
+@media (max-width: 1024px) {
+  main.grid { grid-template-columns: 1fr !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+  /* Make left and right columns stack vertically */
+  .col-span-12\:xl\:col-span-8, .col-span-12\:xl\:col-span-4, .col-span-7, .xl\:col-span-8, .xl\:col-span-4 {
+    grid-column: 1 / -1 !important;
+  }
+  /* Reduce paddings and gaps for mobile */
+  .gap-6 { gap: 0.75rem !important; }
+  .p-6 { padding: 1rem !important; }
+  .px-10 { padding-left: 1rem !important; padding-right: 1rem !important; }
+  /* Make chart area more vertical-friendly: smaller fixed height on medium screens so bars remain contained */
+  .chart-right .grid { height: 96px !important; max-height: 96px !important; }
+  .chart-right .bar { width: clamp(12px, 6vw, 20px) !important; }
+  /* Make task list take full width */
+  .row-span-2.bg-card { width: 100% !important; }
+  /* Reduce font sizes slightly */
+  h1.text-2xl, h1.text-3xl { font-size: 1.25rem !important; }
+}
+
+/* Additional small-screen refinements for card internals */
+@media (max-width: 768px) {
+  /* Reduce card padding and tighten spacing */
+  .rounded-2xl.p-6, .rounded-2xl.p-9 { padding: 0.75rem !important; }
+  .panel-overall { padding: 0.75rem !important; }
+  /* Make the two-column info in panel-overall stack vertically */
+  .panel-overall .grid.grid-cols-2 { grid-template-columns: 1fr !important; gap: 0.5rem !important; }
+  .panel-overall .text-6xl { font-size: 2rem !important; }
+  .panel-overall .text-sm { font-size: 0.75rem !important; }
+  /* Center inner items in small panels */
+  .panel-help, .panel-mood, .panel-time { padding: 1rem !important; align-items: center !important; text-align: center !important; }
+  .panel-help button, .panel-time button { width: auto !important; }
+  /* Task list: make each task row adapt and wrap */
+  .row-span-2.bg-card .mt-4 > .flex { flex-wrap: wrap !important; gap: 0.5rem !important; }
+  .row-span-2.bg-card .mt-4 > .flex .flex-1 { min-width: 140px !important; }
+  /* Make small utility buttons smaller */
+  .h-8.w-8, .h-10.w-10 { width: 36px !important; height: 36px !important; }
+}
+
+
+/* Theme toggle switch styling (used in sidebar) */
+.theme-switch {
+  width: 137px;
+  height: 56px; /* reduced height so knob fits inside */
+  border-radius: 9999px;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px; /* slightly smaller padding */
+  position: relative;
+  border: 3px solid rgba(196,196,196,0.9);
+  box-sizing: border-box;
+  overflow: hidden; /* prevent knob from spilling out */
+}
+
+/* Circular knob */
+.theme-switch .knob {
+  width: 72px;
+  height: 72px;
+  border-radius: 9999px;
+  background: var(--accent);
+  transform: translateX(0);
+  transition: transform 260ms cubic-bezier(.2,.9,.2,1), background 200ms;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-switch .knob svg { display: block; }
+
+.theme-switch .moon {
+  /* Keep the SVG visually inline with its button and avoid intercepting pointer events
+     when the SVG is absolutely positioned inside the switch. The click should be
+     handled by the surrounding button, so disable pointer events on the SVG. */
+  position: relative;
+  right: 0;
+  color: #9CA3AF;
+  display: block;
+  pointer-events: none; /* allow clicks to pass through to the button */
+}
+
+.theme-switch.dark { border-color: rgba(182,182,182,0.9); background: transparent; }
+.theme-switch.dark .knob { transform: translateX(68px); background: var(--accent); }
+.theme-switch.dark .moon { color: var(--muted); }
+
+/* New button styles for accessibility and click targets */
+.theme-switch .knob-button,
+.theme-switch .moon-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Sun button: permanent left control that remains visible in dark mode */
+.theme-switch .sun-button {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  z-index: 3;
+  color: var(--muted);
+}
+
+/* Ensure the sun icon is high-contrast in dark mode (visible on dark backgrounds) */
+.theme-switch .sun-button svg { pointer-events: none; fill: currentColor; stroke: currentColor; }
+.theme-switch.dark .sun-button,
+html.cm-dark .theme-switch .sun-button {
+  color: var(--accent-on) !important; /* navy color so it stands out */
+}
+
+.theme-switch .knob-button { width: 72px; height: 72px; border-radius: 9999px; position: relative; z-index: 1; pointer-events: auto; }
+.theme-switch .moon-button { width: 48px; height: 48px; border-radius: 9999px; color: var(--muted); position: relative; z-index: 2; pointer-events: auto; }
+
+/* New animated knob behavior */
+.theme-switch { transition: border-color 220ms ease, background 220ms ease; }
+/* Use absolute positioning so the knob does not affect layout flow and can
+   slide precisely between the two ends without leaving gaps when the other
+   button is hidden. */
+.theme-switch { position: relative; }
+.theme-switch .knob-button {
+  position: absolute;
+  left: -1px; /* visual left anchor; we animate with transform for smoother motion */
+  top: 50%;
+  transform: translateY(-50%) translateX(0);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px; height: 55px; /* smaller knob so it fits inside track */
+  border-radius: 9999px;
+  background: var(--accent);
+  transition: transform 260ms cubic-bezier(.2,.9,.2,1), background 200ms, box-shadow 200ms;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  z-index: 2; /* sit below the moon icon so the moon remains visible when active */
+}
+.theme-switch .moon-button {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px; height: 36px; /* slightly smaller moon button */
+  display: inline-flex; align-items:center; justify-content:center;
+  background: transparent;
+  z-index: 6; /* be on top of the knob so the moon is always visible */
+  transition: opacity 180ms ease, transform 180ms ease;
+  /* Add a white ring so the moon icon is visible on the mustard knob */
+  border-radius: 9999px;
+  border: 4px solid #ffffff;
+  box-sizing: border-box;
+  padding: 0;
+}
+.theme-switch.dark { border-color: rgba(182,182,182,0.9); }
+/* Move knob to the right end when dark */
+.theme-switch.dark .knob-button { /* keep left:6px and move via transform for smooth animation */ background: var(--card-light); }
+.theme-switch.dark .knob-button svg circle { fill: var(--accent-on); }
+/* Keep the separate moon-button visible (slightly faded) so users can click it
+  to toggle back to light mode; do not fully hide it. */
+.theme-switch.dark .moon-button { opacity: 0.9; pointer-events: auto; transform: translateY(-50%) scale(0.98); }
+.theme-switch:not(.dark) .moon-button { opacity: 0.9; pointer-events: auto; transform: translateY(-50%) scale(1); }
+
+/* Small sun icon style (white rays on mustard) */
+.theme-switch .knob-button svg circle { fill: var(--accent-on); }
+.theme-switch .knob-button svg g, .theme-switch .knob-button svg path { stroke: rgba(255,255,255,0.9); }
+
+/* Moon button subtle position */
+.theme-switch .moon-button svg { stroke: var(--muted); }
+
+/* Ensure the moon SVG does not intercept pointer events (button should receive clicks)
+  and set a clear default fill/colour. We'll override these values in dark mode so the
+  moon icon is high-contrast against the mustard indicator. */
+.theme-switch .moon-button svg { pointer-events: none; fill: currentColor; color: var(--muted); }
+
+/* In dark mode make the moon icon high-contrast (use --accent-on/navy) so it is visible
+  on top of the mustard indicator. Also ensure the svg uses the color for fill/stroke. */
+.theme-switch.dark .moon-button svg,
+html.cm-dark .theme-switch .moon-button svg {
+  stroke: var(--accent-on) !important;
+  fill: var(--accent-on) !important;
+  color: var(--accent-on) !important;
+}
+
+/* Force moon svg to use currentColor and be visible in both themes; specific selector to override other rules */
+.theme-switch .moon-button svg { stroke: currentColor !important; fill: currentColor !important; color: currentColor !important; pointer-events: none; }
+
+/* Ensure moon-button sits above most elements so it is clickable and visible */
+.theme-switch .moon-button { z-index: 999 !important; }
+
+/* Make sure the knob does not obscure the moon — keep knob underneath the moon */
+.theme-switch .knob-button { z-index: 1 !important; }
+.theme-switch.dark .knob-button { z-index: 1 !important; }
+
+/* In dark mode explicitly force moon svg to high-contrast navy (accent-on) */
+.theme-switch.dark .moon-button svg,
+html.cm-dark .theme-switch .moon-button svg {
+  stroke: var(--accent-on) !important;
+  fill: var(--accent-on) !important;
+  color: var(--accent-on) !important;
+}
+
+/* .moon-icon: explicit fill rules so the path is visible when knob overlaps */
+.theme-switch .moon-icon { fill: var(--muted); stroke: var(--muted); }
+.theme-switch.dark .moon-icon,
+html.cm-dark .theme-switch .moon-icon { fill: var(--accent-on) !important; stroke: var(--accent-on) !important; }
+/* Add a subtle mustard circle behind the moon icon that is revealed when in dark mode */
+
+/* When the switch is in dark state, reveal the mustard indicator behind the moon */
+.theme-switch.dark .moon-button::before,
+html.cm-dark .theme-switch .moon-button::before {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* Single toggle button used for both desktop and mobile views */
+.theme-toggle {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+}
+.theme-toggle:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* When dark, shift visual state: move knob to right by translation via sibling selector */
+.theme-switch.dark .knob-button { transform: translateY(-50%) translateX(68px); z-index: 1; }
+.theme-switch .knob-button svg circle { fill: var(--accent-on); }
+
+/* Removed second block of attribute-match mappings; keep CSS minimal and
+   explicit. Use our theme variables and targeted selectors for consistent
+   results across modes. */
+
+/* Panels inversion in dark mode: when .cm-dark is active these panels
+   become light surfaces and inner small cards flip to the dark card color
+   for contrast (mirrors the design reference). */
+.cm-dark .panel-overall,
+.cm-dark .panel-time,
+.cm-dark .panel-plan,
+.cm-dark .panel-mood {
+  background: var(--card) !important; /* light card surface in dark mode */
+  color: var(--text) !important;
+}
+.cm-dark .panel-overall .text-accent, .cm-dark .panel-overall .text-accent * {
+  color: var(--accent) !important;
+}
+.cm-dark .panel-overall .bg-card,
+.cm-dark .panel-time .bg-card,
+.cm-dark .panel-plan .bg-card {
+  background: var(--card-dark) !important; /* inner elements contrast */
+  color: #EDEDEB !important;
+}
+
+/* Reinforce with the highest-specificity selectors (use html.class forms)
+   to make sure these panel rules win over other utility classes or external CSS. */
+html:not(.cm-dark) .panel-overall,
+html:not(.cm-dark) .panel-time,
+html:not(.cm-dark) .panel-plan,
+html:not(.cm-dark) .panel-mood {
+  background: var(--card-dark) !important;
+  color: #EDEDEB !important;
+}
+html:not(.cm-dark) .panel-overall.bg-card,
+html:not(.cm-dark) .panel-time.bg-card,
+html:not(.cm-dark) .panel-plan.bg-card,
+html:not(.cm-dark) .panel-mood.bg-card {
+  background: var(--card-dark) !important;
+  color: #EDEDEB !important;
+}
+
+html.cm-dark .panel-overall,
+html.cm-dark .panel-time,
+html.cm-dark .panel-plan,
+html.cm-dark .panel-mood {
+  background: var(--card-light) !important; /* explicit light surface in dark mode */
+  /* Ensure inverted panels use a dark text color so icons and text are readable */
+  color: var(--card-dark) !important;
+}
+html.cm-dark .panel-overall.bg-card,
+html.cm-dark .panel-time.bg-card,
+html.cm-dark .panel-plan.bg-card,
+html.cm-dark .panel-mood.bg-card {
+  background: var(--card-light) !important;
+  color: var(--text) !important;
+
+/* Keep the large numbers mustard in dark mode (match accent) */
+html.cm-dark .panel-overall .text-6xl,
+html.cm-dark .panel-overall .text-5xl,
+html.cm-dark .panel-overall .text-4xl,
+html.cm-dark .panel-overall .font-extrabold,
+html.cm-dark .panel-overall .text-accent {
+  color: var(--accent) !important;
+}
+
+/* Light mode: make the Overall Information header white so it's visible on the dark panel */
+html:not(.cm-dark) .panel-overall h2,
+html:not(.cm-dark) .panel-overall .text-3xl {
+  color: #FFFFFF !important;
+}
+
+/* Light mode: ensure small icons on top of the white small cards are visible (mustard) */
+html:not(.cm-dark) .panel-overall .bg-card svg,
+html:not(.cm-dark) .panel-overall .h-10.w-6.rounded-full svg {
+  stroke: var(--accent) !important;
+  fill: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* Sidebar: active link glass effect and yellow glass hover */
+aside[aria-label="Primary"] a[aria-current="page"] {
+  background: rgba(214,195,59,0.10) !important; /* low-opacity mustard */
+  color: var(--accent) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 12px;
+  transition: background 180ms ease, color 120ms ease;
+}
+
+aside[aria-label="Primary"] a:hover {
+  background: rgba(214,195,59,0.08) !important;
+  color: var(--accent) !important;
+}
+
+/* Make hover/focus transitions smoother for nav items */
+aside[aria-label="Primary"] a { transition: background 160ms ease, color 160ms ease; }
+
+}
+html.cm-dark .panel-overall .bg-card,
+html.cm-dark .panel-time .bg-card,
+html.cm-dark .panel-plan .bg-card {
+  background: var(--card-dark) !important; /* inner elements contrast */
+  color: #EDEDEB !important;
+}
+
+/* Ensure SVG/icons inside inverted panels are dark (visible on white) */
+html.cm-dark .panel-overall svg,
+html.cm-dark .panel-time svg,
+html.cm-dark .panel-plan svg,
+html.cm-dark .panel-mood svg {
+  stroke: var(--card-dark) !important;
+  fill: var(--card-dark) !important;
+  color: var(--card-dark) !important;
+}
+
+/* Make small cards inside the Overall panel readable in dark mode. */
+html.cm-dark .panel-overall .bg-card,
+html.cm-dark .panel-overall .panel-plan,
+html.cm-dark .panel-overall .panel-overall-inner {
+  background: var(--card) !important; /* light surface */
+  color: var(--text) !important;      /* dark text */
+}
+
+/* Ensure the small icon container and number use the mustard accent for contrast */
+html.cm-dark .panel-overall .text-accent,
+html.cm-dark .panel-overall .h-10.w-6.rounded-full.grid.place-items-center {
+  color: var(--accent) !important; /* mustard for numbers/icons */
+}
+html.cm-dark .panel-overall .h-10.w-6.rounded-full.grid.place-items-center svg,
+html.cm-dark .panel-overall .bg-card svg {
+  stroke: var(--accent) !important;
+  fill: var(--accent) !important;
+}
+
+/* Make the small card titles/labels legible */
+html.cm-dark .panel-overall .text-xs,
+html.cm-dark .panel-overall [class*="text-[12px]"] {
+  color: var(--muted) !important;
+}
+
+/* Broad icon visibility in dark mode: ensure interactive icons and svg glyphs
+   use the high-contrast text color so users can see and click them. This helps
+   when some SVGs or inline icons still have baked fills or unexpected attrs. */
+html.cm-dark svg,
+html.cm-dark button svg,
+html.cm-dark .h-5.w-5 svg,
+html.cm-dark .theme-switch svg,
+html.cm-dark .moon,
+html.cm-dark .knob-button svg {
+  stroke: var(--text) !important;
+  fill: var(--text) !important;
+  color: var(--text) !important;
+}
+
+/* Keep the moon button tinted appropriately on top of the mustard indicator: use accent-on (navy)
+   for the moon to contrast against the mustard dot, but ensure it's still visible where needed. */
+html.cm-dark .theme-switch .moon-button svg,
+html.cm-dark .theme-switch .moon {
+  stroke: var(--accent-on) !important;
+  fill: var(--accent-on) !important;
+  color: var(--accent-on) !important;
+}
+
+/* Ensure the moon button remains clickable — SVGs don't capture pointer events */
+.theme-switch .moon-button svg { pointer-events: none; }
+
+/* Extra: ensure most button and small control icons are visible in dark mode
+   by forcing color on buttons and small icon containers. This covers cases
+   where icons are wrapped in spans or have size utilities. */
+html.cm-dark .h-10,
+html.cm-dark .h-8,
+html.cm-dark .h-12,
+html.cm-dark .w-10,
+html.cm-dark .grid.place-items-center,
+html.cm-dark .rounded-full {
+  color: var(--text) !important;
+}
+
+
+/* Ensure SVG/icons inside panels are visible and follow text color in both themes */
+html.cm-dark .panel-overall svg,
+html.cm-dark .panel-plan svg,
+html.cm-dark .panel-mood svg {
+  stroke: var(--text) !important;
+  fill: var(--text) !important;
+  color: var(--text) !important;
+}
+
+html:not(.cm-dark) .panel-time svg,
+html:not(.cm-dark) .panel-plan svg,
+html:not(.cm-dark) .panel-mood svg {
+  fill: #111111 !important;
+  color: #EDEDEB !important;
+}
+
+/* Strong override: ensure the small cards inside .panel-overall are readable in dark mode */
+html.cm-dark .panel-overall .bg-card {
+  background: #EFEFEF !important; /* light surface for small cards */
+  color: #151515 !important;      /* dark text for numbers/labels */
+}
+
+/* Icon container inside small cards (mustard icon) */
+html.cm-dark .panel-overall .h-10.w-6.grid.place-items-center,
+html.cm-dark .panel-overall .h-10.w-6.rounded-full.grid.place-items-center {
+  background: #EFEFEF !important;
+  color: var(--accent) !important;
+}
+html.cm-dark .panel-overall .h-10.w-6.grid.place-items-center svg,
+html.cm-dark .panel-overall .h-10.w-6.rounded-full.grid.place-items-center svg {
+  stroke: var(--accent) !important;
+  fill: var(--accent) !important;
+}
+
+/* Make the big number text dark and bold in small cards */
+html.cm-dark .panel-overall .text-4xl,
+html.cm-dark .panel-overall .text-5xl,
+html.cm-dark .panel-overall .font-extrabold {
+  color: #151515 !important;
+}
+
+/* Ensure the big numbers keep the mustard accent in both modes */
+.panel-overall .text-6xl.font-extrabold.text-accent,
+.panel-overall .text-6xl.font-extrabold.text-accent *,
+html.cm-dark .panel-overall .text-6xl.font-extrabold,
+html:not(.cm-dark) .panel-overall .text-6xl.font-extrabold {
+  color: var(--accent) !important;
+}
+
+/* Force small card numbers and icons to mustard accent */
+.panel-overall .h-10.w-6.rounded-full svg,
+.panel-overall .text-4xl,
+.panel-overall .text-5xl,
+.panel-overall .font-extrabold {
+  color: var(--accent) !important;
+}
+
+/* Make the Overall header clearly visible on the panel (white) */
+.panel-overall h2,
+.panel-overall .text-3xl {
+  color: #ffffff !important;
+}
+
+/* Sidebar: make active state look like a subtle glassy pill on the left */
+aside[aria-label="Primary"] ul li a[aria-current="page"] {
+  background: linear-gradient(rgba(255,255,255,0.04), rgba(255,255,255,0.02)) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  color: var(--accent) !important;
+  border-radius: 12px;
+}
+aside[aria-label="Primary"] ul li a:hover {
+  background: rgba(214,195,59,0.08) !important;
+  color: var(--accent) !important;
+}
+
+/* Make the small metric numbers (34, 23, 13) dark text in dark mode and ensure their icons are visible */
+html.cm-dark .panel-overall .metrics-grid .bg-card {
+  background: #ffffff !important; /* ensure small card appears white */
+  color: #151515 !important;      /* dark text for numbers */
+}
+
+html.cm-dark .panel-overall .metrics-grid .bg-card .text-4xl,
+html.cm-dark .panel-overall .metrics-grid .bg-card .text-5xl {
+  color: #151515 !important; /* numbers dark */
+}
+
+/* Ensure small icons on top of the small cards are visible and use dark color in dark mode */
+html.cm-dark .panel-overall .metrics-grid .bg-card .h-10.w-6.rounded-full,
+html.cm-dark .panel-overall .metrics-grid .bg-card .h-10.w-6.rounded-full svg {
+  background: transparent !important;
+  color: var(--accent) !important; /* keep the icon in accent for visibility */
+  fill: var(--accent) !important;
+  stroke: var(--accent) !important;
+}
+
+/* Apply the same pleasing dark-mode look (dark numbers + accent icons) to the small cards in ALL modes */
+.panel-overall .metrics-grid .bg-card {
+  background: #ffffff !important;
+  color: #151515 !important;
+}
+.panel-overall .metrics-grid .bg-card .text-4xl,
+.panel-overall .metrics-grid .bg-card .text-5xl {
+  color: #151515 !important; /* dark numbers */
+}
+.panel-overall .metrics-grid .bg-card .h-10.w-6.rounded-full svg {
+  color: var(--accent) !important;
+  fill: var(--accent) !important;
+  stroke: var(--accent) !important;
+}
+
+/* Small-card numbers should be dark for readability; icons on top remain accent-colored */
+.panel-overall .metrics-grid .bg-card .text-6xl,
+.panel-overall .metrics-grid .bg-card .text-4xl,
+.panel-overall .metrics-grid .bg-card .text-5xl {
+  color: #151515 !important; /* dark numbers per user preference */
+  text-shadow: none !important;
+}
+.panel-overall .metrics-grid .bg-card .h-10.w-6.rounded-full {
+  background: transparent !important;
+  display: grid;
+  place-items: center;
+}
+.panel-overall .metrics-grid .bg-card .h-10.w-6.rounded-full svg {
+  color: var(--accent) !important;
+  fill: var(--accent) !important;
+  stroke: var(--accent) !important;
+}
+
+/* Sidebar icons: smoother rendering and yellow accent on hover/active */
+/* Sidebar icons: subtle default, yellow on hover/active (matches the attachment) */
+aside[aria-label="Primary"] ul li a svg,
+aside[aria-label="Primary"] ul li a svg * {
+  transition: color .14s ease, transform .12s ease, opacity .12s ease;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.2;
+}
+
+/* Default (light mode): subtle soft-yellow tinted icon like the attachment */
+aside[aria-label="Primary"] ul li a svg {
+  color: rgba(214,195,59,0.85); /* soft mustard for the non-hover small icon shown in your first small image */
+  fill: currentColor;
+  stroke: currentColor;
+  opacity: 0.95;
+}
+
+/* When in dark mode, icons should be subtle (light gray) not blocky */
+html.cm-dark aside[aria-label="Primary"] ul li a svg {
+  color: rgba(255,255,255,0.75);
+  fill: currentColor;
+  stroke: currentColor;
+  opacity: 0.9;
+}
+
+/* Hover & active: keep icon subtle (do NOT force yellow); allow background highlight but preserve icon color */
+aside[aria-label="Primary"] ul li a:hover svg,
+aside[aria-label="Primary"] ul li a[aria-current="page"] svg {
+  color: rgba(0,0,0,0.45) !important; /* subtle in light mode */
+  fill: none !important; /* prefer stroke-only so it's not blocky */
+  stroke: currentColor !important;
+  transform: translateX(2px) scale(1.04);
+  opacity: 1;
+}
+html.cm-dark aside[aria-label="Primary"] ul li a:hover svg,
+html.cm-dark aside[aria-label="Primary"] ul li a[aria-current="page"] svg {
+  color: rgba(255,255,255,0.78) !important; /* subtle in dark mode */
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
+/* Sidebar: make active and hover states use the yellow accent and color icons yellow on hover/active */
+aside[aria-label="Primary"] ul li a[aria-current="page"],
+aside[aria-label="Primary"] ul li a:hover {
+  background: rgba(214,195,59,0.12) !important; /* subtle yellow glass */
+  color: var(--accent) !important; /* link text can turn accent if desired */
+}
+/* Keep the svg icons from switching to accent color on hover/active; inherit a subtle color instead */
+aside[aria-label="Primary"] ul li a[aria-current="page"] svg,
+aside[aria-label="Primary"] ul li a:hover svg {
+  color: inherit !important;
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
+/* Ensure labels are legible */
+html.cm-dark .panel-overall [class*="text-[12px]"],
+html.cm-dark .panel-overall .text-xs {
+  color: var(--muted) !important;
+}
+
+/* Final explicit overrides to match the actual markup in Homepage.jsx */
+/* Make the metric numbers dark and ensure the circle icons above them are accent-colored */
+.panel-overall .metrics-grid .bg-card .font-extrabold,
+.panel-overall .metrics-grid .bg-card .text-primary,
+.panel-overall .metrics-grid .bg-card .text-4xl,
+.panel-overall .metrics-grid .bg-card .text-5xl {
+  color: #151515 !important; /* dark numbers */
+}
+.panel-overall .metrics-grid .bg-card .h-10.w-6.rounded-full {
+  background: #ffffff !important; /* keep the circle white */
+  box-shadow: 0 6px 12px rgba(0,0,0,0.06) !important;
+  display: grid; place-items: center;
+}
+.panel-overall .metrics-grid .bg-card .h-10.w-6.rounded-full svg {
+  stroke: var(--accent) !important;
+  fill: var(--accent) !important;
+  color: var(--accent) !important;
+  stroke-width: 1.8 !important;
+}
+
+/* Ensure these rules also apply in dark mode (panel inverted surfaces) */
+html.cm-dark .panel-overall .metrics-grid .bg-card .font-extrabold,
+html.cm-dark .panel-overall .metrics-grid .bg-card .text-primary {
+  color: #151515 !important;
+}
+html.cm-dark .panel-overall .metrics-grid .bg-card .h-10.w-6.rounded-full svg {
+  stroke: var(--accent) !important;
+  fill: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* Sidebar icons: default subtle color, yellow on hover/active; favor stroke rendering to avoid blocky fills */
+aside[aria-label="Primary"] ul li a svg {
+  color: rgba(0,0,0,0.45) !important; /* subtle in light mode */
+  fill: none !important; /* prefer stroke-only visuals for crispness */
+  stroke: currentColor !important;
+}
+html.cm-dark aside[aria-label="Primary"] ul li a svg {
+  color: rgba(255,255,255,0.78) !important; /* subtle in dark mode */
+  fill: none !important;
+  stroke: currentColor !important;
+}
+aside[aria-label="Primary"] ul li a:hover svg,
+aside[aria-label="Primary"] ul li a[aria-current="page"] svg {
+  color: var(--accent) !important;
+  fill: var(--accent) !important; /* if any fill exists, color it */
+  stroke: var(--accent) !important;
+  transform: translateX(2px) scale(1.02) !important;
+}
+
+/* For icons that used text-accent class on active item, ensure they still look crisp */
+aside[aria-label="Primary"] ul li a.text-accent svg,
+aside[aria-label="Primary"] ul li a.bg-card svg {
+  color: var(--accent) !important;
+  stroke: var(--accent) !important;
+}
+
+/* Final override: prevent sidebar icons from turning yellow on hover/active.
+   Force them to inherit a subtle stroke-only color regardless of earlier rules. */
+aside[aria-label="Primary"] ul li a:hover svg,
+aside[aria-label="Primary"] ul li a[aria-current="page"] svg,
+aside[aria-label="Primary"] ul li a:hover svg *,
+aside[aria-label="Primary"] ul li a[aria-current="page"] svg * {
+  color: inherit !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  opacity: 0.95 !important;
+}
+
+/* Force the small metric numbers (in the panel-overall metrics-grid) to be dark */
+.panel-overall .metrics-grid .bg-card .text-4xl,
+.panel-overall .metrics-grid .bg-card .text-5xl,
+.panel-overall .metrics-grid .bg-card .font-extrabold,
+html.cm-dark .panel-overall .metrics-grid .bg-card .text-4xl,
+html.cm-dark .panel-overall .metrics-grid .bg-card .text-5xl,
+html.cm-dark .panel-overall .metrics-grid .bg-card .font-extrabold {
+  color: #151515 !important;
+}
+
+/* Chart styling: make the right-column chart match the reference image */
+.row-span-2.bg-card .mt-6 {
+  background: #F3EFE0 !important; /* subtle warm paper */
+  padding: 14px 18px !important;
+  border-radius: 12px !important;
+  position: relative !important;
+  overflow: hidden !important; /* prevent bars from spilling outside the card */
+  box-sizing: border-box !important;
+}
+
+/* Horizontal guide lines inside chart - use pseudo element for crisp lines */
+.row-span-2.bg-card .mt-6::before {
+  content: '';
+  position: absolute;
+  left: 18px; right: 18px; top: 22px; bottom: 22px;
+  background-image: linear-gradient(to bottom, rgba(11,35,64,0.06) 0px, rgba(11,35,64,0.06) 1px, transparent 1px, transparent 44px);
+  background-size: 100% 44px;
+  pointer-events: none;
+  border-radius: 8px;
+}
+
+/* Bars: pill-like with mustard base and darker cap on top */
+.row-span-2.bg-card .mt-6 .w-6 {
+  width: 24px !important;
+  margin: 0 auto !important;
+  border-radius: 4px !important; /* smaller radius for rectangular look */
+  box-shadow: none !important;
+  /* Make the bar container transparent; the fill element carries the color */
+  background: transparent !important;
+  position: relative !important;
+  overflow: hidden !important; /* clip the fill to rounded corners */
+}
+.bar { width: 24px; height: 100%; display:block; border-radius: 2px !important; background: transparent; position: relative; margin: 0 auto; }
+.bar-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Solid mustard fill with minimal rounding to appear rectangular/square */
+  background: rgba(214,195,59,1);
+  border-radius: 2px; /* even smaller rounding for crisp rectangle */
+  box-shadow: none; /* remove inner shadow for flat appearance */
+  outline: 1px solid rgba(0,0,0,0.06); /* subtle edge for contrast */
+  transition: height 220ms ease;
+}
+
+/* Ensure the cap sits visually at the top: use transform when the bar is short */
+.row-span-2.bg-card .mt-6 .w-6[data-height="short"]::after {
+  bottom: 40% !important;
+}
+
+/* X-axis labels */
+.row-span-2.bg-card .mt-6 .text-\[10px\] {
+  display: block !important;
+  text-align: center !important;
+  margin-top: 8px !important;
+  color: rgba(11,35,64,0.5) !important;
+  font-weight: 600 !important;
+}
+
+/* Chart wrapper with left axis labels */
+.chart-wrap {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.chart-left { width: 36px; display:flex; flex-direction:column; justify-content:space-between; padding-top:6px; }
+.chart-left .chart-label { color: rgba(11,35,64,0.6); font-size: 13px; }
+.chart-right { flex: 1; }
+.chart-right .grid { margin-left: 0; }
+
+/* Ensure bars fill area and are clipped to chart */
+.chart-right .grid { height: 112px !important; max-height: 112px !important; position: relative; overflow: hidden; }
+.chart-right .grid > div { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.chart-right .bar { height: 100%; display: block; box-sizing: border-box; width: clamp(16px, 3.4vw, 28px); }
+.chart-right .bar-fill { transition: height 300ms ease; max-height: 100%; box-sizing: border-box; }
+
+/* Small safety: ensure inner bar elements cannot exceed container */
+.chart-right .bar, .chart-right .bar-fill { max-height: 100%; }
+
+/* Dark mode: make the profile card (Goodmorning card) dark, but keep the inner chart light */
+html.cm-dark .row-span-2.bg-card.rounded-2xl.p-9 {
+  background: var(--card-dark) !important; /* dark card */
+  color: var(--card-light) !important;
+  border-color: rgba(255,255,255,0.04) !important;
+}
+
+/* Keep avatar ring and heading readable in dark card */
+html.cm-dark .row-span-2.bg-card.rounded-2xl.p-9 .h-20.w-20.rounded-full {
+  border: 6px solid rgba(255,255,255,0.06) !important;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.4) !important;
+}
+html.cm-dark .row-span-2.bg-card.rounded-2xl.p-9 h2 {
+  color: var(--card-light) !important;
+}
+
+/* Force the inner chart container to remain light even in dark mode */
+html.cm-dark .row-span-2.bg-card.rounded-2xl.p-9 .mt-6 {
+  /* Force the chart area to the requested light cream in dark mode */
+  background: #F2EFE0 !important;
+  color: var(--text) !important;
+}
+
+/* In dark mode, ensure the horizontal guide lines are visible over the light chart */
+html.cm-dark .row-span-2.bg-card.rounded-2xl.p-9 .mt-6::before {
+  background-image: linear-gradient(to bottom, rgba(11,35,64,0.06) 0px, rgba(11,35,64,0.06) 1px, transparent 1px, transparent 44px) !important;
+}
+
+/* Ensure the left axis labels are visible over the light chart */
+html.cm-dark .row-span-2.bg-card.rounded-2xl.p-9 .chart-left .chart-label {
+  color: rgba(11,35,64,0.6) !important;
+}
+
+/* Preserve bar fill appearance in dark mode (mustard base with dark cap) */
+html.cm-dark .row-span-2.bg-card.rounded-2xl.p-9 .bar-fill {
+  /* keep this selector in place but we will override later to ensure a flat mustard fill */
+  background: linear-gradient(to top, var(--accent) 0%, var(--accent) 78%, rgba(17,17,17,0.82) 78%) !important;
+}
+
+/* Profile card (right column top) — match the provided visual example */
+
+.row-span-2.bg-card.rounded-2xl.p-9 {
+  background: #FBF9F3 !important; /* warmer cream */
+  border: 1px solid rgba(11,35,64,0.06) !important;
+  box-shadow: 0 6px 14px rgba(11,35,64,0.035) !important;
+  padding: 22px !important;
+  border-radius: 14px !important;
+}
+
+.row-span-2.bg-card .h-20.w-20.rounded-full {
+  width: 96px !important;
+  height: 96px !important;
+  background: var(--accent) !important;
+  border-radius: 9999px !important;
+  display: grid !important;
+  place-items: center !important;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.06) !important;
+  border: 8px solid rgba(255,255,255,0.9) !important;
+  overflow: hidden !important;
+}
+
+.row-span-2.bg-card h2 {
+  font-size: 1.45rem !important;
+  line-height: 1.05 !important;
+  color: var(--text) !important;
+  font-weight: 900 !important;
+  margin-top: 8px !important;
+}
+
+/* Inner chart container style */
+.row-span-2.bg-card .mt-6 {
+  background: #F2EFE0 !important; /* Force chart area to the requested light cream */
+  padding: 14px !important;
+  border-radius: 12px !important;
+  margin-top: 18px !important;
+}
+
+/* Bars: pill-like bars with mustard base and subtle dark cap */
+.row-span-2.bg-card .mt-6 .w-6.rounded-t.bg-accent,
+.chart-right .bar-fill,
+.row-span-2.bg-card .mt-6 .bar-fill {
+  /* mustard at bottom with a darker cap at the top for better visual separation */
+  background: linear-gradient(to top, var(--accent) 0%, var(--accent) 78%, rgba(17,17,17,0.82) 78%) !important;
+  border-radius: 10px !important;
+}
+
+/* Small x-axis labels */
+.row-span-2.bg-card .mt-6 .text-\[10px\] {
+  color: rgba(11,35,64,0.45) !important;
+  font-weight: 600 !important;
+}
+
+/* Make sure chart bars keep crisp edges and no extra shadow */
+.row-span-2.bg-card .mt-6 .w-6 {
+  box-shadow: none !important;
+}
+
+/* Make the "See All" button always mustard yellow and ensure readable text in both themes */
+.row-span-2.bg-card button.bg-accent.w-full,
+.row-span-2.bg-card .mt-6.w-full.bg-accent {
+  background: var(--accent) !important;
+  color: var(--accent-on) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+.row-span-2.bg-card button.bg-accent.w-full:hover,
+.row-span-2.bg-card .mt-6.w-full.bg-accent:hover {
+  background: var(--accent) !important;
+  color: var(--accent-on) !important;
+}
+
+/* Very subtle glassy hover for project update rows (extremely low opacity) */
+.row-span-2.bg-card .mt-4 > .flex {
+  transition: background-color 160ms ease, backdrop-filter 160ms ease, transform 160ms ease;
+  background: transparent !important;
+  border-color: rgba(11,35,64,0.06) !important;
+}
+.row-span-2.bg-card .mt-4 > .flex:hover {
+  /* almost imperceptible tint for a gentle glass touch */
+  background-color: rgba(11,35,64,0.02) !important;
+  backdrop-filter: blur(1px) saturate(1.02) !important;
+}
+
+/* Dark mode: use a faint light tint for hover so it reads on dark backgrounds */
+html.cm-dark .row-span-2.bg-card .mt-4 > .flex:hover {
+  background-color: rgba(255,255,255,0.02) !important;
+  backdrop-filter: blur(1px) saturate(1.02) !important;
+}
+
+/* Ultra-specific selector matching Homepage.jsx structure to override any remaining rules */
+.panel-overall .mt-8.grid.grid-cols-3.gap-5 > div.bg-card .text-4xl,
+.panel-overall .mt-8.grid.grid-cols-3.gap-5 > div.bg-card .text-5xl,
+.panel-overall .mt-8.grid.grid-cols-3.gap-5 > div.bg-card .font-extrabold,
+html.cm-dark .panel-overall .mt-8.grid.grid-cols-3.gap-5 > div.bg-card .text-4xl,
+html.cm-dark .panel-overall .mt-8.grid.grid-cols-3.gap-5 > div.bg-card .text-5xl,
+html.cm-dark .panel-overall .mt-8.grid.grid-cols-3.gap-5 > div.bg-card .font-extrabold {
+  color: #151515 !important;
+}
+
+/* Strong override: force bars to be solid mustard rectangles everywhere. */
+.chart-right .bar-fill,
+.row-span-2.bg-card .mt-6 .bar-fill,
+.row-span-2.bg-card .mt-6 .w-6 .bar-fill,
+html.cm-dark .row-span-2.bg-card.rounded-2xl.p-9 .bar-fill {
+  background: var(--accent) !important; /* solid mustard */
+  border-radius: 2px !important; /* crisp rectangle */
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove any pseudo-element cap or forced ::after positioning for bars */
+.row-span-2.bg-card .mt-6 .w-6::after,
+.row-span-2.bg-card .mt-6 .w-6 .bar-fill::after,
+.row-span-2.bg-card .mt-6 .bar-fill::after {
+  display: none !important;
+  content: none !important;
+}
+

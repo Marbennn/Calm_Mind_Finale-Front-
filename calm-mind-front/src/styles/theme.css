@@ -1,0 +1,34 @@
+/* Small animation helpers used by the Settings About page */
+@keyframes cm-fade-up {
+	from { opacity: 0; transform: translateY(10px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+.cm-fade-up {
+	animation: cm-fade-up 420ms cubic-bezier(.2,.9,.2,1) both;
+}
+.cm-delay-1 { animation-delay: 80ms; }
+.cm-delay-2 { animation-delay: 160ms; }
+.cm-delay-3 { animation-delay: 240ms; }
+.cm-delay-4 { animation-delay: 320ms; }
+
+/* Subtle card hover lift */
+.cm-card-hover {
+	transition: transform 220ms cubic-bezier(.2,.9,.2,1), box-shadow 220ms ease, border-color 220ms ease;
+}
+.cm-card-hover:hover {
+	transform: translateY(-6px);
+	box-shadow: 0 10px 30px rgba(16,24,40,0.08);
+	border-color: rgba(0,0,0,0.06);
+}
+
+/* Soft focus ring for interactive elements */
+.cm-focus-ring:focus{
+	outline: none;
+	box-shadow: 0 0 0 4px rgba(250,204,21,0.12);
+	border-radius: 8px;
+}
+
+/* Utility to slightly dim and blur background for modals */
+.cm-backdrop-blur { backdrop-filter: blur(4px); }
+
