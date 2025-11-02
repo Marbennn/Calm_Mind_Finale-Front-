@@ -45,7 +45,9 @@ const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
     setIsChecking(false);
 
     api
-      .get("/users/profile", { headers: { Authorization: `Bearer ${localToken}` } })
+      .get("/users/profile", {
+        headers: { Authorization: `Bearer ${localToken}` },
+      })
       .then((res) => {
         if (!(res.status === 200 && res.data?.user)) {
           logout();
@@ -56,7 +58,10 @@ const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
         const status = err?.response?.status;
         // Treat 404 (no profile yet) as allowed; only force logout on 401/invalid
         if (status === 401 || !status) {
-          console.warn("Token invalid or request failed:", err?.response?.data || err?.message);
+          console.warn(
+            "Token invalid or request failed:",
+            err?.response?.data || err?.message
+          );
           logout();
           setIsValid(false);
         }
@@ -126,13 +131,12 @@ function App() {
     <ThemeProvider>
       <Router>
         <Routes>
-          {/* Default / Public Routes */}
-          <Route
-            path="/"
-            element={token ? <Navigate to="/home" replace /> : <SignupScreen />}
-          />
+          {/* Public Routes */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginScreen />} />
+          <Route path="/signup" element={<SignupScreen />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/verify-email/:token" element={<VerifyEmailScreen />} />
 
           {/* Protected User Routes */}
           <Route
@@ -233,9 +237,6 @@ function App() {
 
           {/* 404 Fallback */}
           <Route path="*" element={<NotFoundPage />} />
-          <Route path="/verify-email/:token" element={<VerifyEmailScreen />} />
-          <Route path="/admin-home" element={<AdminHomepage />} />
-
         </Routes>
       </Router>
     </ThemeProvider>
