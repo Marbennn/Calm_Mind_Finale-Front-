@@ -6,23 +6,20 @@ import { useAuthStore } from "../store/authStore";
 export const useGetStartedStore = create((set) => ({
   completed: false,
   getStartedData: {
+    department: "",
     course: "",
     yearLevel: "",
     studentNumber: "",
-    address: "",
-    contactNumber: "",
   },
   loading: false,
   error: null,
 
-  // Setters
   setCompleted: (value) => set({ completed: value }),
   setGetStartedData: (data) =>
     set((state) => ({ getStartedData: { ...state.getStartedData, ...data } })),
   setLoading: (value) => set({ loading: value }),
   setError: (error) => set({ error }),
 
-  // 🟢 Submit "Get Started" form to backend
   submitGetStarted: async (data, navigate) => {
     const { user, token } = useAuthStore.getState();
 
@@ -34,11 +31,10 @@ export const useGetStartedStore = create((set) => ({
     set({ loading: true, error: null });
 
     try {
-      // ✅ Include userId from logged-in user
       const payload = { ...data, userId: user.id };
 
       const response = await axios.post(
-        "http://localhost:4000/api/get-started",
+        "http://localhost:4000/api/get-started/",
         payload,
         {
           headers: {
@@ -53,10 +49,7 @@ export const useGetStartedStore = create((set) => ({
         navigate("/home");
       }
     } catch (err) {
-      console.error(
-        "❌ Error submitting get-started form:",
-        err.response?.data || err.message
-      );
+      console.error(err.response?.data || err.message);
       set({ error: err.response?.data?.message || "Submission failed" });
       alert(
         err.response?.data?.message ||
@@ -71,11 +64,10 @@ export const useGetStartedStore = create((set) => ({
     set({
       completed: false,
       getStartedData: {
+        department: "",
         course: "",
         yearLevel: "",
         studentNumber: "",
-        address: "",
-        contactNumber: "",
       },
       loading: false,
       error: null,

@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useContext, useMemo, useRef } from "react";
-import Sidebar from "../components/Sidebar"; // adjust path if needed
+import Sidebar from "../components/Sidebar";
 import { ThemeContext } from "../context/ThemeContext";
 import Card from "../components/HoverCard";
 import { useNavigate } from "react-router-dom";
-import { useProfileStore } from "../store/useProfileStore"; // ✅ import your Zustand profile store
+import { useProfileStore } from "../store/useProfileStore";
 import api from "../api/client";
 
 // Recharts (match Analytics/Chatbot styling)
@@ -142,6 +142,19 @@ export default function HomePage() {
     () => notifications.filter((n) => !n.read).length,
     [notifications]
   );
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   /* ---------------------------- Auto-Missing logic --------------------------- */
   const [now, setNow] = useState(Date.now());
@@ -339,26 +352,89 @@ export default function HomePage() {
                   Home
                 </h1>
                 <div className="flex items-center gap-2">
-                  <button
-                    className="relative h-12 w-12 grid place-items-center rounded-full bg-card border border-gray-200 shadow-sm"
-                    onClick={fetchNotifications}
-                  >
-                    <svg
-                      className="h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
+                  <div className="relative" ref={notifRef}>
+                    <button
+                      className="relative h-12 w-12 grid place-items-center rounded-full bg-card border border-gray-200 shadow-sm"
+                      onClick={() => {
+                        fetchNotifications();
+                        setShowNotifications(!showNotifications);
+                      }}
                     >
-                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                    </svg>
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 text-xs text-white flex items-center justify-center">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
+                      <svg
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                      </svg>
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 text-xs text-white flex items-center justify-center">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </button>
+                    {showNotifications && (
+                      <div className="absolute top-full right-0 mt-2 w-80 bg-card rounded-xl shadow-xl border border-gray-200 z-50 p-4 max-h-96 overflow-y-auto">
+                        <div className="flex items-start justify-between mb-3">
+                          <h2 className="text-xl font-medium tracking-tight text-primary">
+                            Notifications
+                          </h2>
+                          <button
+                            className="text-sm text-accent underline hover:opacity-80"
+                            onClick={fetchNotifications}
+                          >
+                            Refresh
+                          </button>
+                        </div>
+                        {loadingNotifs ? (
+                          <p className="text-gray-500 text-sm">
+                            Loading notifications...
+                          </p>
+                        ) : notifications.length === 0 ? (
+                          <div className="mt-2 text-gray-500 text-sm">
+                            You have no notifications.
+                          </div>
+                        ) : (
+                          <ul className="space-y-2">
+                            {notifications.map((n) => (
+                              <li
+                                key={n._id}
+                                className={`p-3 rounded-lg border ${
+                                  n.read
+                                    ? "bg-white text-gray-600 border-gray-100"
+                                    : "bg-yellow-50 text-gray-800 border-yellow-200"
+                                }`}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <div className="font-medium">
+                                      {n.message}
+                                    </div>
+                                    <div className="text-xs text-gray-400 mt-1">
+                                      {new Date(n.created_at).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  {!n.read && (
+                                    <button
+                                      onClick={() =>
+                                        markNotificationAsRead(n._id)
+                                      }
+                                      className="text-xs text-accent hover:underline"
+                                    >
+                                      Mark read
+                                    </button>
+                                  )}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     )}
-                  </button>
+                  </div>
                   <button className="h-12 w-12 grid place-items-center rounded-full bg-card border border-gray-200 shadow-sm">
                     <span className="text-base">👤</span>
                   </button>
@@ -440,7 +516,9 @@ export default function HomePage() {
               {/* Help card */}
               <Card className="col-span-12 md:col-span-6 p-6 h-83 flex flex-col items-center justify-center text-center panel-help bg-gradient-to-br from-white to-gray-50 shadow-lg">
                 <div className="text-5xl mb-2 text-accent">🤖</div>
-                <h3 className="text-2xl font-bold text-accent">Need Some Help?</h3>
+                <h3 className="text-2xl font-bold text-accent">
+                  Need Some Help?
+                </h3>
                 <p className="text-base text-gray-700 mt-4 leading-relaxed max-w-[32rem]">
                   Let the AI Coach plan your next 25 minutes.
                 </p>
@@ -449,7 +527,13 @@ export default function HomePage() {
                   aria-label="Open Coach"
                   onClick={() => navigate(CHATBOT_ROUTE)}
                 >
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.38 0 018 8v.5z" />
                   </svg>
                   Open Coach

@@ -93,7 +93,7 @@ export default function Sidebar({ active }) {
         import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:4000";
 
       // Optional backend logout
-      await fetch(`${API_BASE}/api/auth/logout`, {
+      await fetch(`${API_BASE}/users/logout`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

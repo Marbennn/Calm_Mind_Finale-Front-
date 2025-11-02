@@ -41,11 +41,12 @@ export default function SignupScreen() {
       setError("");
       setLoading(true);
 
-      const ok = await signup(
-        `${form.firstName} ${form.lastName}`.trim(),
-        form.email.toLowerCase(),
-        form.password
-      );
+      const ok = await signup({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.toLowerCase(),
+        password: form.password,
+      });
 
       if (!ok) {
         setError(storeError || "Registration failed.");
@@ -207,8 +208,10 @@ export default function SignupScreen() {
             </div>
 
             {/* Error display */}
-            {error && (
-              <p className="text-red-500 text-sm text-center">{error}</p>
+            {(error || storeError) && (
+              <p className="text-red-500 text-sm text-center">
+                {error || storeError}
+              </p>
             )}
 
             <button
