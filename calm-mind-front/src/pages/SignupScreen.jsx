@@ -41,33 +41,38 @@ export default function SignupScreen() {
     setError("");
     setLoading(true);
 
-      const ok = await signup({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        email: form.email.toLowerCase(),
-        password: form.password,
-      });
+    const ok = await signup({
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      email: form.email.toLowerCase(),
+      password: form.password,
+    });
 
-      if (!ok) {
-        setError(storeError || "Registration failed.");
-        return;
-      }
+    if (!ok) {
+      setError(storeError || "Registration failed.");
+      return;
+    }
+    if (ok.token) {
+      alert("Registration successful! Please verify your email.");
+      navigate(`/verify-email/${ok.token}`);
+    } else {
 
       alert("Registration successful! Please log in to continue.");
       navigate("/login");
-    } catch (err) {
-      console.error("Signup error:", err);
-      setError("Registration failed.");
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (err) {
+    console.error("Signup error:", err);
+    setError("Registration failed.");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleGoLogin = () => {
-    setFormAnimation("animate-swap-out-right");
-    setImageAnimation("animate-swap-out-right");
-    setTimeout(() => navigate("/login"), 300);
-  };
+const handleGoLogin = () => {
+  setFormAnimation("animate-swap-out-right");
+  setImageAnimation("animate-swap-out-right");
+  setTimeout(() => navigate("/login"), 300);
+};
 
   return (
     <div className="fixed inset-0 flex w-full overflow-hidden">

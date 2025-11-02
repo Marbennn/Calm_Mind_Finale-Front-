@@ -20,30 +20,30 @@ export const useAuthStore = create(
 
       // -------------------- SIGNUP --------------------
       signup: async ({ firstName, lastName, email, password }) => {
-        try {
-          set({ loading: true, error: null });
+  try {
+    set({ loading: true, error: null });
 
-          const res = await api.post(
-            "http://localhost:4000/api/users/register",
-            { firstName, lastName, email, password }
-          );
+    const res = await api.post(
+      "http://localhost:4000/api/users/register",
+      { firstName, lastName, email, password }
+    );
 
-          const { user, token } = res.data;
+    const { user, token } = res.data;
 
-          localStorage.setItem("token", token);
-          localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
 
-          set({ user, token, loading: false });
-          return user;
-        } catch (err) {
-          console.error("Signup failed:", err.response?.data || err.message);
-          set({
-            error: err.response?.data?.message || "Signup failed",
-            loading: false,
-          });
-          return null;
-        }
-      },
+    set({ user, token, loading: false });
+    return { user, token };
+  } catch (err) {
+    console.error("Signup failed:", err.response?.data || err.message);
+    set({
+      error: err.response?.data?.message || "Signup failed",
+      loading: false,
+    });
+    return null;
+  }
+},
 
       // -------------------- ADMIN: Users management --------------------
       fetchAllUsers: async () => {
