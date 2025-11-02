@@ -70,7 +70,7 @@ const useStressStore = create((set, get) => ({
   fetchTasks: async () => {
     set({ loading: true });
     try {
-      const res = await api.get(`/tasks?user_id=${USER_ID}`);
+      const res = await api.get('/tasks');
       // Normalize tasks so every task has a stable `id` field (use _id when present)
       const tasks = res.data.map(t => ({
         ...t,
@@ -91,10 +91,7 @@ const useStressStore = create((set, get) => ({
   addTask: async (taskData) => {
     set({ loading: true });
     try {
-      const res = await api.post("/tasks", {
-        ...taskData,
-        user_id: USER_ID
-      });
+      const res = await api.post("/tasks", taskData);
       // Normalize new task id
       const newTask = { ...res.data.task, id: res.data.task.id || res.data.task._id, stress: calculateTaskStress(res.data.task) };
       const updatedTasks = [...get().tasks, newTask];
@@ -168,13 +165,18 @@ const useStressStore = create((set, get) => ({
 
   // Analytics Operations
   updateAnalytics: (tasks = get().tasks) => {
-    // Calculate average stress
+    // Connect averageStress to the total task stress level (percent of total vs max across active tasks)
     const activeStress = tasks
       .filter(t => !t.completed && t.status !== 'completed')
       .map(t => t.stress);
-    const averageStress = activeStress.length 
-      ? activeStress.reduce((a, b) => a + b, 0) / activeStress.length
-      : 0;
+    const totalStress = activeStress.reduce((a, b) => a + b, 0);
+    const maxStress = activeStress.length; // each active task maxes at 1.0 in this model
+    const averageStress = maxStress > 0 ? Number(((totalStress / maxStress) * 100).toFixed(1)) : 0; // 0..100
+
+    // Task-management total stress snapshot (sum over active tasks)
+    const totalStressTask = activeStress.reduce((a, b) => a + b, 0); // 0..N (since each per-task stress is 0..1)
+    const maxStressTask = activeStress.length; // each active task maxes at 1.0 in this model
+    const totalStressPercent = maxStressTask > 0 ? Number(((totalStressTask / maxStressTask) * 100).toFixed(1)) : 0;
 
     // Calculate stress by category
     const categories = ['todo', 'in_progress', 'missing', 'completed'];
@@ -214,7 +216,7 @@ const useStressStore = create((set, get) => ({
 
     set({
       analytics: {
-        averageStress,
+        averageStress, // now represents total stress level as percent (0..100)
         stressByCategory,
         weeklyTrend,
         predictedStress: Math.min(1, predictedStress), // Cap at 100%
@@ -258,9 +260,23 @@ const useStressStore = create((set, get) => ({
         ? activeStress.reduce((a, b) => a + b, 0) / activeStress.length
         : 0,
       total: activeStress.reduce((a, b) => a + b, 0),
+      max: activeStress.length, // theoretical max when every active task is at stress=1
+      percent: activeStress.length ? Number(((activeStress.reduce((a,b)=>a+b,0) / activeStress.length) * 100).toFixed(1)) : 0,
       count: activeStress.length,
       lastUpdate: get().lastUpdate,
     };
+  },
+
+  // Expose task-management totals for any consumer without UI changes
+  getTaskStressTotals: () => {
+    const tasks = get().tasks;
+    const activeStress = tasks
+      .filter(t => !t.completed && t.status !== 'completed')
+      .map(t => t.stress);
+    const total = activeStress.reduce((a, b) => a + b, 0);
+    const max = activeStress.length;
+    const percent = max > 0 ? Number(((total / max) * 100).toFixed(1)) : 0;
+    return { total, max, percent, average: max ? total / max : 0 };
   },
 }));
 
