@@ -1,15 +1,16 @@
 // src/pages/TaskManagement.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { Plus, MoreVertical, Kanban, List, Table, X } from "lucide-react";
+import { Plus, Kanban, Table, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import TaskBoard from "../components/TaskBoard";
-import TaskListView from "../components/TaskListView";
+// Removed: import TaskListView from "../components/TaskListView";
 import TaskTableView from "../components/TaskTableView";
 import TaskForm from "../components/TaskForm";
 import TaskOverview from "../components/TaskOverview";
 import KebabMenu from "../components/KebabMenu";
 import useStressStore from "../store/useStressStore";
 import { generateOverallRecommendations } from "../utils/stressUtils";
+import api from "../api/client";
 
 const USER_ID = "69008a1fd3c8660f1ff28779";
 
@@ -40,7 +41,12 @@ export default function TaskManagement() {
 
   /* ---------- Local State ---------- */
   const [view, setView] = useState("board");
-  const [showSidebar, setShowSidebar] = useState(true);
+
+  // Summary visibility
+  const [showSidebar] = useState(true);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [isSummaryVisible, setIsSummaryVisible] = useState(true);
+
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [editingTaskId, setEditingTaskId] = useState(null);
@@ -56,30 +62,66 @@ export default function TaskManagement() {
   });
   const [formError, setFormError] = useState("");
 
-  /* ---------- Data Loading ---------- */
+  /* ---------- Notifications ---------- */
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+  const fetchNotifications = async () => {
+    try {
+      setLoadingNotifs(true);
+      const res = await api.get("/notifications");
+      setNotifications(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    } finally {
+      setLoadingNotifs(false);
+    }
+  };
+
+  const markNotificationAsRead = async (id) => {
+    try {
+      await api.put(`/notifications/${id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === id ? { ...n, read: true } : n))
+      );
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
+  };
+
   useEffect(() => {
     fetchTasks();
     const interval = setInterval(fetchTasks, 30000);
     return () => clearInterval(interval);
   }, [fetchTasks]);
 
+  useEffect(() => {
+    fetchNotifications();
+    const id = setInterval(fetchNotifications, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications]
+  );
+
   /* ---------- Derived State & Analytics ---------- */
   const dailyStress = getDailyStressSummary();
   const activeCount = tasks.filter((t) => !t.completed).length;
 
-  // Tips based on current stress levels
   const overallTips = useMemo(
     () => generateOverallRecommendations(tasks, dailyStress),
     [tasks, dailyStress]
   );
 
-  /* ---------- Board helpers (columns, grouping, actions) ---------- */
+  /* ---------- Board helpers ---------- */
   const deriveStatus = useCallback((task) => {
     if (!task) return "todo";
     if (task.completed || task.status === "completed") return "completed";
     const due = task.due_date ? new Date(task.due_date) : null;
-    const now = new Date();
-    if (due && due < now) return "missing";
+    if (due && due < new Date()) return "missing";
     if (task.status === "in_progress") return "in_progress";
     return "todo";
   }, []);
@@ -103,10 +145,9 @@ export default function TaskManagement() {
     return grouped;
   }, [tasks, deriveStatus]);
 
-  // Use per-task stress values from store
   const taskStresses = useMemo(() => {
     const map = {};
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       map[task.id] = Math.round(getTaskStress(task.id) * 100);
     });
     return map;
@@ -114,10 +155,10 @@ export default function TaskManagement() {
 
   const taskStressList = useMemo(() => {
     return tasks
-      .filter(t => !t.completed)
-      .map(t => ({
+      .filter((t) => !t.completed)
+      .map((t) => ({
         id: t.id,
-        title: t.title || 'Untitled',
+        title: t.title || "Untitled",
         percent: Math.round(getTaskStress(t.id) * 100),
       }))
       .sort((a, b) => b.percent - a.percent);
@@ -127,11 +168,13 @@ export default function TaskManagement() {
     const counts = new Map();
     tasks.forEach((t) => {
       if (t.completed) return;
-      (t.tags || []).forEach((tag) => counts.set(tag, (counts.get(tag) || 0) + 1));
+      (t.tags || []).forEach((tag) =>
+        counts.set(tag, (counts.get(tag) || 0) + 1)
+      );
     });
     const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-    const a = sorted[0]?.[0] || '(no tags)';
-    const b = sorted[1]?.[0] || '(no tags)';
+    const a = sorted[0]?.[0] || "(no tags)";
+    const b = sorted[1]?.[0] || "(no tags)";
     return [a, b];
   }, [tasks]);
 
@@ -176,7 +219,9 @@ export default function TaskManagement() {
         priority: task.priority || "Medium",
         status: task.status || "todo",
         startDate: formatDate(task.startDate || task.start_date),
-        dueDate: formatDate(task.dueDate || task.due_date) || new Date().toISOString().slice(0, 10),
+        dueDate:
+          formatDate(task.dueDate || task.due_date) ||
+          new Date().toISOString().slice(0, 10),
         tags: task.tags || [],
       });
     } else {
@@ -216,11 +261,31 @@ export default function TaskManagement() {
     }, {});
 
     return {
-      todo: Math.round((byStatus.todo || []).reduce((a, b) => a + b, 0) / (byStatus.todo?.length || 1) * 100),
-      in_progress: Math.round((byStatus.in_progress || []).reduce((a, b) => a + b, 0) / (byStatus.in_progress?.length || 1) * 100),
-      missing: Math.round((byStatus.missing || []).reduce((a, b) => a + b, 0) / (byStatus.missing?.length || 1) * 100),
+      todo: Math.round(
+        (((byStatus.todo || []).reduce((a, b) => a + b, 0) /
+          (byStatus.todo?.length || 1)) *
+          100) || 0
+      ),
+      in_progress: Math.round(
+        (((byStatus.in_progress || []).reduce((a, b) => a + b, 0) /
+          (byStatus.in_progress?.length || 1)) *
+          100) || 0
+      ),
+      missing: Math.round(
+        (((byStatus.missing || []).reduce((a, b) => a + b, 0) /
+          (byStatus.missing?.length || 1)) *
+          100) || 0
+      ),
     };
   }, [tasks, getTaskStress, deriveStatus]);
+
+  const stressPct = Math.round(dailyStress.average * 100);
+  const stressColor =
+    dailyStress.average < 0.5
+      ? "#fcd34d"
+      : dailyStress.average < 0.75
+      ? "#f59e0b"
+      : "#111827";
 
   /* ---------- Render ---------- */
   if (loading) {
@@ -232,19 +297,131 @@ export default function TaskManagement() {
   }
 
   return (
-    <div className="min-h-screen h-screen flex">
+    <div className="min-h-screen h-screen flex overflow-hidden mb-4">
       <Sidebar theme={theme} onToggleTheme={toggleTheme} active="Tasks" />
 
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Header */}
-        <header className="h-20 px-6 flex items-center justify-between border-b bg-white">
-          <h1 className="text-3xl font-bold">Task Management</h1>
+      {/* hidden scrollbar utility + stop scroll chaining */}
+      <style>{`
+        .cm-scroll { overflow-y: auto; -ms-overflow-style: none; scrollbar-width: none; overscroll-behavior: contain; }
+        .cm-scroll::-webkit-scrollbar { display: none; }
+      `}</style>
+
+      <div className="flex-1 flex flex-col min-h-0 px-2 pt-2 pb-4 overflow-hidden">
+        {/* ===== Header ===== */}
+        <div className="h-20 md:h-[80px] w-full px-4 flex items-center justify-between bg-card rounded-xl shadow-md cursor-default">
           <div className="flex items-center gap-3">
-            {/* View Toggle */}
-            <div className="hidden sm:flex items-center rounded-full border bg-white p-1 shadow-sm">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+              Task Management
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Mobile: open Summary drawer */}
+            <button
+              className="block lg:hidden relative h-12 w-12 grid place-items-center rounded-full bg-card border border-gray-200 shadow-sm"
+              onClick={() => setIsSummaryOpen(true)}
+              aria-label="Open summary"
+            >
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 6h18M3 12h12M3 18h18" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            {/* Notifications */}
+            <div className="relative">
+              <button
+                className="relative h-12 w-12 grid place-items-center rounded-full bg-card border border-gray-200 shadow-sm"
+                onClick={() => {
+                  setIsNotifOpen((prev) => !prev);
+                  fetchNotifications();
+                }}
+                aria-label="Toggle notifications"
+              >
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 text-xs text-white flex items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </button>
+              {isNotifOpen && (
+                <div className="absolute right-0 top-14 w-80 bg-card rounded-xl shadow-xl overflow-hidden z-50 max-h-96">
+                  {loadingNotifs ? (
+                    <p className="p-4 text-gray-500 text-sm">
+                      Loading notifications...
+                    </p>
+                  ) : notifications.length === 0 ? (
+                    <p className="p-4 text-gray-500 text-sm">
+                      You have no notifications.
+                    </p>
+                  ) : (
+                    <ul className="overflow-y-auto max-h-80">
+                      {notifications.map((n) => (
+                        <li
+                          key={n._id}
+                          className={`p-4 border-b border-gray-100 last:border-0 ${
+                            n.read
+                              ? "bg-white text-gray-600"
+                              : "bg-yellow-50 text-gray-800"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start gap-4">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">
+                                {n.message}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">
+                                {new Date(n.created_at).toLocaleString()}
+                              </div>
+                            </div>
+                            {!n.read && (
+                              <button
+                                onClick={() => markNotificationAsRead(n._id)}
+                                className="text-xs text-accent hover:underline whitespace-nowrap"
+                              >
+                                Mark read
+                              </button>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Account placeholder */}
+            <button
+              className="h-12 w-12 grid place-items-center rounded-full bg-card border border-gray-200 shadow-sm"
+              aria-label="Account"
+            >
+              <span className="text-base">👤</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ===== Actions toolbar ===== */}
+        <div className="w-full px-2 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl p-3 md:p-4">
+            <div className="hidden sm:flex items-center rounded-full bg-white p-1 shadow-sm">
               {[
                 { key: "board", Icon: Kanban, label: "Board" },
-                { key: "list", Icon: List, label: "List" },
                 { key: "table", Icon: Table, label: "Table" },
               ].map((v) => (
                 <button
@@ -252,7 +429,7 @@ export default function TaskManagement() {
                   onClick={() => setView(v.key)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full transition ${
                     view === v.key
-                      ? "bg-amber-600 text-white"
+                      ? "bg-black text-amber-400 shadow"
                       : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
@@ -265,38 +442,32 @@ export default function TaskManagement() {
             <select
               value={view}
               onChange={(e) => setView(e.target.value)}
-              className="sm:hidden border rounded-md px-3 py-2 text-sm"
+              className="sm:hidden rounded-md px-3 py-2 text-sm bg-white shadow-sm"
             >
               <option value="board">Board</option>
-              <option value="list">List</option>
               <option value="table">Table</option>
             </select>
 
-            {/* Actions */}
-            <button
-              onClick={() => openForm()}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition"
-            >
-              <Plus size={16} /> Add Task
-            </button>
-            <button
-              onClick={() => setShowSidebar(!showSidebar)}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition"
-            >
-              {showSidebar ? "Hide" : "Show"} Summary
-            </button>
-            <KebabMenu
-              items={[
-                { label: "Delete All", danger: true, onClick: deleteAll },
-              ]}
-            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openForm()}
+                className="flex items-center gap-2 px-4 py-2 bg-black text-amber-400 rounded-lg hover:bg-gray-800 transition shadow-sm"
+              >
+                <Plus size={16} /> Add Task
+              </button>
+              <KebabMenu
+                items={[
+                  { label: "Delete All", danger: true, onClick: deleteAll },
+                ]}
+              />
+            </div>
           </div>
-        </header>
+        </div>
 
-        {/* Main Content */}
-        <main className="flex-1 flex gap-4 p-4">
+        {/* ===== Main Content (no page scroll) ===== */}
+        <main className="flex-1 flex gap-2 p-1 min-h-0 overflow-hidden">
           {/* Task View */}
-          <section className="flex-1 bg-white rounded-xl shadow-sm border overflow-hidden">
+          <section className="flex-1 bg-white rounded-2xl shadow-md overflow-hidden min-h-0">
             {view === "board" && (
               <TaskBoard
                 columns={columns}
@@ -311,17 +482,7 @@ export default function TaskManagement() {
                 completeTask={completeTask}
               />
             )}
-            {view === "list" && (
-              <TaskListView
-                tasks={tasks}
-                deriveStatus={deriveStatus}
-                onEdit={openForm}
-                onDelete={deleteTask}
-                onStatusChange={updateTaskStatus}
-                completeTask={completeTask}
-                onRowClick={openOverview}
-              />
-            )}
+            {/* Removed TaskListView */}
             {view === "table" && (
               <TaskTableView
                 tasks={tasks}
@@ -334,97 +495,250 @@ export default function TaskManagement() {
             )}
           </section>
 
-          {/* AI Sidebar */}
-          {showSidebar && (
-            <aside className="w-80 bg-white rounded-xl shadow-sm border p-6 space-y-6">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-lg font-bold">Stress Level</h3>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      dailyStress.average < 0.5
-                        ? "bg-green-100 text-green-700"
-                        : dailyStress.average < 0.75
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
+          {/* Mobile overlay for Summary drawer */}
+          {isSummaryOpen && (
+            <div
+              className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+              onClick={() => setIsSummaryOpen(false)}
+            />
+          )}
+
+          {/* ===== Summary Sidebar (scrollable) ===== */}
+          {showSidebar && isSummaryVisible && (
+            <aside
+              className={[
+                "w-80 bg-white rounded-2xl shadow-md border border-gray-100",
+                "h-[calc(100vh-1.5rem)] lg:h-[calc(100vh-2rem)]",
+                "flex flex-col min-h-0 overflow-hidden",
+                "transition-transform duration-300 flex-shrink-0",
+                isSummaryOpen
+                  ? "fixed right-3 top-3 bottom-3 z-50 translate-x-0"
+                  : "fixed right-3 top-3 bottom-3 z-50 translate-x-[110%]",
+                "lg:static lg:translate-x-0 lg:z-auto lg:top-auto lg:bottom-auto",
+              ].join(" ")}
+            >
+              {/* Mobile close (X) */}
+              <button
+                className="absolute top-3 left-3 text-gray-500 hover:text-gray-700 lg:hidden"
+                onClick={() => setIsSummaryOpen(false)}
+                aria-label="Close summary"
+              >
+                <svg
+                  className="h-6 w-6"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {/* Header (fixed) */}
+              <div className="px-3 pt-2 pb-2 flex items-center justify-between shrink-0">
+                <h3 className="text-base font-semibold tracking-tight text-black">Summary</h3>
+                <button
+                  className="text-gray-400 hover:text-gray-700 hidden lg:inline-flex"
+                  onClick={() => setIsSummaryVisible(false)}
+                  aria-label="Hide summary"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
                   >
-                    {Math.round(dailyStress.average * 100)}%
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600">
-                  {activeCount} active tasks
-                </p>
+                    <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
 
-                <div className="mt-2">
-                  <div className="w-full h-2 bg-gray-200 rounded overflow-hidden">
+              {/* Scrollable content ONLY here */}
+              <div className="cm-scroll px-3 pt-3 pb-36 flex-1 min-h-0 space-y-4">
+                {/* Overview Card */}
+                <div className="rounded-xl border border-gray-100 bg-gradient-to-b from-white to-gray-50 p-4">
+                  <div className="flex items-center gap-4">
+                    {/* Radial gauge */}
                     <div
-                      className={`${dailyStress.average < 0.5 ? 'bg-blue-500' : dailyStress.average < 0.75 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                      style={{ width: `${Math.round(dailyStress.average * 100)}%`, height: '100%' }}
-                    />
-                  </div>
-                </div>
+                      className="h-[72px] w-[72px] rounded-full grid place-items-center shrink-0"
+                      style={{
+                        background: `conic-gradient(${stressColor} ${stressPct}%, #e5e7eb ${stressPct}%)`,
+                      }}
+                    >
+                      <div className="h-[56px] w-[56px] rounded-full bg-white grid place-items-center text-sm font-semibold text-gray-900">
+                        {stressPct}%
+                      </div>
+                    </div>
 
-                <div className="mt-3 text-sm text-gray-700">
-                  <span className="font-medium">Main contributors:</span> {topTags[0]}, {topTags[1]}
-                </div>
-
-                {/* Overall list: all active tasks by stress percent */}
-                <div className="mt-4">
-                  <div className="text-sm font-semibold mb-2">Task stress percentages</div>
-                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                    {taskStressList.map((t) => (
-                      <div key={t.id} className="text-sm">
-                        <div className="flex justify-between">
-                          <span className="truncate max-w-[60%]" title={t.title}>{t.title}</span>
-                          <span className="ml-2">{t.percent}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-gray-200 rounded overflow-hidden">
-                          <div
-                            className={`${t.percent < 50 ? 'bg-blue-500' : t.percent < 75 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                            style={{ width: `${t.percent}%`, height: '100%' }}
-                          />
+                    {/* Metrics */}
+                    <div className="flex-1 grid grid-cols-2 gap-3">
+                      <div className="rounded-lg bg-white border border-gray-100 p-2">
+                        <div className="text-[11px] text-gray-500">Active</div>
+                        <div className="text-sm font-semibold text-gray-900">{activeCount}</div>
+                      </div>
+                      <div className="rounded-lg bg-white border border-gray-100 p-2">
+                        <div className="text-[11px] text-gray-500">Top tags</div>
+                        <div className="mt-1 flex gap-1 flex-wrap">
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 max-w-[7.5rem] truncate">
+                            {topTags[0]}
+                          </span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700/80 max-w-[7.5rem] truncate">
+                            {topTags[1]}
+                          </span>
                         </div>
                       </div>
-                    ))}
+                    </div>
+                  </div>
+
+                  {/* Linear bar */}
+                  <div className="mt-4">
+                    <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-black"
+                        style={{ width: `${stressPct}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 flex justify-between text-[11px] text-gray-500">
+                      <span>Low</span>
+                      <span>High</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Simple numeric lines for status-based stress (percentage) */}
-                <div className="mt-4 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span>To Do</span>
-                    <span>{statusPercents.todo}%</span>
+                {/* What’s spiking stress — ALWAYS a dropdown */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold text-gray-900">What’s spiking stress</div>
+                    <span className="text-[11px] text-gray-400">
+                      Top {Math.min(5, taskStressList.length)}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>In Progress</span>
-                    <span>{statusPercents.in_progress}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Missing</span>
-                    <span>{statusPercents.missing}%</span>
+
+                  <details className="rounded-lg border border-gray-100 bg-white group">
+                    <summary className="list-none cursor-pointer select-none p-2 text-sm font-medium text-gray-900 flex items-center justify-between">
+                      <span>Show items</span>
+                      <svg
+                        className="h-4 w-4 text-gray-500 transition-transform group-open:rotate-180"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </summary>
+
+                    <div className="p-2 space-y-2 max-h-64 overflow-auto">
+                      {taskStressList.length === 0 ? (
+                        <div className="text-xs text-gray-500">
+                          No active tasks. Enjoy the calm ✨
+                        </div>
+                      ) : (
+                        taskStressList.slice(0, 5).map((t) => (
+                          <div key={t.id} className="rounded-lg border border-gray-100 bg-white p-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="truncate text-sm font-medium text-gray-900" title={t.title}>
+                                {t.title}
+                              </div>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                                {t.percent}%
+                              </span>
+                            </div>
+                            <div className="mt-1 h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  t.percent < 50
+                                    ? "bg-amber-300"
+                                    : t.percent < 75
+                                    ? "bg-amber-500"
+                                    : "bg-black"
+                                }`}
+                                style={{ width: `${t.percent}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </details>
+                </div>
+
+                {/* Status breakdown */}
+                <div className="rounded-xl border border-gray-100 bg-white p-3">
+                  <div className="text-sm font-semibold mb-2 text-gray-900">By status</div>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                        <span className="text-gray-700">To Do</span>
+                      </div>
+                      <span className="font-medium text-gray-900">{statusPercents.todo}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                        <span className="text-gray-700">In Progress</span>
+                      </div>
+                      <span className="font-medium text-gray-900">{statusPercents.in_progress}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                        <span className="text-gray-700">Missing</span>
+                      </div>
+                      <span className="font-medium text-gray-900">{statusPercents.missing}%</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <h3 className="text-lg font-bold mb-3">AI Stress Reducer</h3>
-                {overallTips && overallTips.length > 0 ? (
-                  <ul className="text-sm text-gray-700 leading-relaxed list-disc pl-5 space-y-1">
-                    {overallTips.map((t, i) => (
-                      <li key={i}>{t}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm italic text-gray-700 leading-relaxed">All tasks complete. You're in zen mode!</p>
-                )}
+                {/* AI tips */}
+                <div className="rounded-xl border border-gray-100 bg-gradient-to-b from-white to-amber-50/50 p-3">
+                  <div className="text-sm font-semibold mb-2 text-gray-900">AI Stress Reducer</div>
+                  {overallTips && overallTips.length > 0 ? (
+                    <ul className="text-sm text-gray-700 leading-relaxed space-y-1">
+                      {overallTips.map((t, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                          <span>{t}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm italic text-gray-600">
+                      All tasks complete. You're in zen mode!
+                    </p>
+                  )}
+                </div>
               </div>
             </aside>
+          )}
+
+          {/* Desktop "show summary" tab when hidden */}
+          {!isSummaryVisible && (
+            <button
+              className="hidden lg:flex fixed right-0 top-1/2 -translate-y-1/2 z-30 h-12 w-8 bg-white rounded-l-lg shadow-md items-center justify-center text-gray-500 hover:text-gray-700"
+              onClick={() => setIsSummaryVisible(true)}
+              aria-label="Show summary"
+            >
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           )}
         </main>
       </div>
 
-      {/* Task Form Modal */}
+      {/* ===== Task Form Modal ===== */}
       {showForm && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -438,10 +752,7 @@ export default function TaskManagement() {
               <h2 className="text-xl font-semibold">
                 {editingTask ? "Edit Task" : "Add Task"}
               </h2>
-              <button
-                onClick={closeForm}
-                className="p-1 hover:bg-gray-100 rounded"
-              >
+              <button onClick={closeForm} className="p-1 hover:bg-gray-100 rounded">
                 <X size={20} />
               </button>
             </div>
@@ -451,7 +762,6 @@ export default function TaskManagement() {
               error={formError}
               isEditing={!!editingTask}
               onSubmit={async () => {
-                // Client-side date validation: ensure due >= start
                 const hasStart = !!formData.startDate;
                 const hasDue = !!formData.dueDate;
                 if (hasStart && hasDue) {
@@ -466,16 +776,20 @@ export default function TaskManagement() {
                     return;
                   }
                 }
-                // clear previous errors
                 setFormError("");
-                const eid = editingTaskId || formData.id || editingTask?.id || editingTask?._id;
+                const eid =
+                  editingTaskId ||
+                  formData.id ||
+                  editingTask?.id ||
+                  editingTask?._id;
+
+                const toISO = (d) => {
+                  if (!d) return null;
+                  const parsed = new Date(d);
+                  return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+                };
+
                 if (eid) {
-                  // Ensure date fields are included and formatted as ISO strings when sent to the backend
-                  const toISO = (d) => {
-                    if (!d) return null;
-                    const parsed = new Date(d);
-                    return isNaN(parsed.getTime()) ? null : parsed.toISOString();
-                  };
                   await updateTask(eid, {
                     title: formData.title,
                     description: formData.description,
@@ -488,12 +802,7 @@ export default function TaskManagement() {
                   closeForm();
                   return;
                 }
-                // When creating a task also include start_date and format dates
-                const toISO = (d) => {
-                  if (!d) return null;
-                  const parsed = new Date(d);
-                  return isNaN(parsed.getTime()) ? null : parsed.toISOString();
-                };
+
                 await createTask({
                   title: formData.title,
                   description: formData.description,
@@ -511,7 +820,7 @@ export default function TaskManagement() {
         </div>
       )}
 
-      {/* Task Overview */}
+      {/* ===== Task Overview ===== */}
       {viewTaskId && (
         <TaskOverview
           task={viewingTask}

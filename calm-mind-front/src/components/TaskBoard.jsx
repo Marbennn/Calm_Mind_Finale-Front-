@@ -20,11 +20,11 @@ export default function TaskBoard({
 
   const getColumnStyle = (status) => {
     switch (status) {
-      case "todo": return { bg: "bg-amber-50", text: "text-amber-800", dot: "bg-amber-300/60" };
-      case "in_progress": return { bg: "bg-blue-50", text: "text-blue-800", dot: "bg-blue-300/60" };
-      case "completed": return { bg: "bg-green-50", text: "text-green-800", dot: "bg-green-300/60" };
-      case "missing": return { bg: "bg-orange-50", text: "text-orange-800", dot: "bg-orange-300/60" };
-      default: return { bg: "bg-gray-50", text: "text-gray-800", dot: "bg-gray-300/60" };
+      case "todo": return { bg: "bg-black", text: "text-amber-400", dot: "bg-white" };
+      case "in_progress": return { bg: "bg-black", text: "text-amber-400", dot: "bg-white"};
+      case "completed": return { bg: "bg-black", text: "text-amber-400", dot: "bg-white"};
+      case "missing": return { bg: "bg-black", text: "text-amber-400", dot: "bg-white" };
+      default: return { bg: "bg-black", text: "text-amber-400", dot: "bg-white"};
     }
   };
 

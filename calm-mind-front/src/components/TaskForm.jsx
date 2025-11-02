@@ -281,7 +281,7 @@ export default function TaskForm({
           <button
             type="button"
             onClick={addCustomTag}
-            className="whitespace-nowrap rounded-md bg-[#b7a42f] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#a09228] focus:outline-none focus:ring-2 focus:ring-[#b7a42f] focus:ring-offset-2"
+            className="whitespace-nowrap rounded-md bg-black px-4 py-2 text-sm font-medium text-amber-400 shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[#b7a42f] focus:ring-offset-2"
           >
             Add
           </button>
@@ -298,7 +298,7 @@ export default function TaskForm({
         </button>
         <button
           type="submit"
-          className="rounded-md bg-[#b7a42f] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#a09228] focus:outline-none focus:ring-2 focus:ring-[#b7a42f] focus:ring-offset-2"
+          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-amber-400 shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[#b7a42f] focus:ring-offset-2"
         >
           {isEditing ? "Save Changes" : "Add Task"}
         </button>
