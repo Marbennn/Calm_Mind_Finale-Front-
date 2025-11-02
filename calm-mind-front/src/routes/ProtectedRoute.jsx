@@ -23,7 +23,7 @@ const ProtectedRoute = ({ children }) => {
 
     const verifyAuth = async () => {
       try {
-        const res = await api.get("/api/users/profile", {
+        const res = await api.get("/users/profile", {
           headers: { Authorization: `Bearer ${storedToken}` },
         });
 

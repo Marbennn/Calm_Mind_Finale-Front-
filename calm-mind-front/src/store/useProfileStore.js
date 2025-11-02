@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import axios from "axios";
+import api from "../api/client";
 
 export const useProfileStore = create((set) => ({
   profile: {
@@ -21,9 +21,7 @@ export const useProfileStore = create((set) => ({
   fetchProfile: async (userId) => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.get(
-        `http://localhost:4000/api/getStarted/profile/${userId}`
-      );
+      const response = await api.get(`/getStarted/profile/${userId}`);
       if (response.status === 200) {
         const data = response.data.data;
         set({
@@ -42,11 +40,13 @@ export const useProfileStore = create((set) => ({
         });
       }
     } catch (err) {
-      console.error(
-        "Error fetching profile:",
-        err.response?.data || err.message
-      );
-      set({ error: err.response?.data || err.message });
+      // If profile isn't created yet, many backends return 404. Treat as empty profile.
+      if (err?.response?.status === 404) {
+        set({ error: null });
+      } else {
+        console.error("Error fetching profile:", err.response?.data || err.message);
+        set({ error: err.response?.data || err.message });
+      }
     } finally {
       set({ loading: false });
     }
@@ -57,8 +57,8 @@ export const useProfileStore = create((set) => ({
     if (!userId) throw new Error("User ID (_id) is required for update");
     set({ loading: true, error: null });
     try {
-      const response = await axios.put(
-        `http://localhost:4000/api/getStarted/update-profile/${userId}`,
+      const response = await api.put(
+        `/getStarted/update-profile/${userId}`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );

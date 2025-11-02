@@ -41,20 +41,25 @@ export default function SignupScreen() {
       setError("");
       setLoading(true);
 
-      const ok = await signup({
+      const user = await signup({
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.toLowerCase(),
         password: form.password,
       });
 
-      if (!ok) {
+      if (!user) {
         setError(storeError || "Registration failed.");
         return;
       }
 
-      alert("Registration successful! Please log in to continue.");
-      navigate("/login");
+      // Persist userId for stores that load by userId
+      try {
+        const id = user?.id || user?._id;
+        if (id) localStorage.setItem("userId", id);
+      } catch {}
+
+      navigate("/home");
     } catch (err) {
       console.error("Signup error:", err);
       setError("Registration failed.");

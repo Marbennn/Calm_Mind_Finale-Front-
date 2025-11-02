@@ -20,6 +20,7 @@ import GetStarted from "./pages/GetStarted";
 import SettingsLogin from "./pages/SettingsLogin";
 import SettingsAbout from "./pages/SettingsAbout";
 import AdminHomepage from "./pages/admin/AdminHomepage";
+import ReportsPage from "./pages/admin/ReportsPage";
 import { useAuthStore } from "./store/authStore";
 import api from "./api/client";
 
@@ -29,40 +30,36 @@ const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
   const [isValid, setIsValid] = useState(false);
 
   useEffect(() => {
-    const verifyToken = async () => {
-      const localToken = token || localStorage.getItem("token");
+    const localToken = token || localStorage.getItem("token");
 
-      if (!localToken) {
-        logout();
-        setIsValid(false);
-        setIsChecking(false);
-        return;
-      }
+    if (!localToken) {
+      logout();
+      setIsValid(false);
+      setIsChecking(false);
+      return;
+    }
 
-      try {
-        const res = await api.get("http://localhost:4000/api/users/profile", {
-          headers: { Authorization: `Bearer ${localToken}` },
-        });
+    // Optimistically allow when a token exists, verify in background
+    setIsValid(true);
+    setIsChecking(false);
 
-        if (res.status === 200 && res.data?.user) {
-          setIsValid(true);
-        } else {
+    api
+      .get("/users/profile", { headers: { Authorization: `Bearer ${localToken}` } })
+      .then((res) => {
+        if (!(res.status === 200 && res.data?.user)) {
           logout();
           setIsValid(false);
         }
-      } catch (err) {
-        console.warn(
-          "Invalid or expired token:",
-          err.response?.data || err.message
-        );
-        logout();
-        setIsValid(false);
-      } finally {
-        setIsChecking(false);
-      }
-    };
-
-    verifyToken();
+      })
+      .catch((err) => {
+        const status = err?.response?.status;
+        // Treat 404 (no profile yet) as allowed; only force logout on 401/invalid
+        if (status === 401 || !status) {
+          console.warn("Token invalid or request failed:", err?.response?.data || err?.message);
+          logout();
+          setIsValid(false);
+        }
+      });
   }, [token, logout]);
 
   if (isChecking) {
@@ -79,14 +76,6 @@ const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
 
   return children;
 };
-
-function UsersPage() {
-  return <div>Users Page (Under Construction)</div>;
-}
-
-function ReportsPage() {
-  return <div>Reports Page (Under Construction)</div>;
-}
 
 function NotFoundPage() {
   return (
@@ -112,7 +101,7 @@ function NotFoundPage() {
 function App() {
   const { token: storeToken, user, logout } = useAuthStore();
   const token = storeToken || localStorage.getItem("token");
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
   useEffect(() => {
     const handleStorageChange = (event) => {
@@ -230,16 +219,6 @@ function App() {
             }
           />
           <Route path="/admins" element={<Navigate to="/admin" replace />} />
-          <Route
-            path="/admin/users"
-            element={
-              token && isAdmin ? (
-                <UsersPage />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
           <Route
             path="/admin/reports"
             element={

@@ -9,6 +9,14 @@ export const useAuthStore = create(
       token: localStorage.getItem("token") || null,
       loading: false,
       error: null,
+      // Admin analytics fetch state
+      adminLoading: false,
+      adminError: null,
+      adminAnalytics: { tasks: [], stressLogs: [] },
+      // Admin users list state
+      users: [],
+      usersLoading: false,
+      usersError: null,
 
       // -------------------- SIGNUP --------------------
       signup: async ({ firstName, lastName, email, password }) => {
@@ -37,6 +45,52 @@ export const useAuthStore = create(
         }
       },
 
+      // -------------------- ADMIN: Users management --------------------
+      fetchAllUsers: async () => {
+        try {
+          set({ usersLoading: true, usersError: null });
+          const { data } = await api.get('/admin/users');
+          const list = Array.isArray(data?.users) ? data.users : (Array.isArray(data) ? data : []);
+          set({ users: list, usersLoading: false });
+          return list;
+        } catch (err) {
+          set({ usersLoading: false, usersError: err?.response?.data?.message || err?.message || 'Failed to fetch users' });
+          return [];
+        }
+      },
+
+      createAdminOrProfessor: async ({ firstName, lastName, email, password, role }) => {
+        try {
+          const payload = { firstName, lastName, email, password, role };
+          const { data } = await api.post('/users/create', payload);
+          // Optionally refresh list
+          try { await get().fetchAllUsers(); } catch {}
+          return data;
+        } catch (err) {
+          throw err;
+        }
+      },
+
+      updateCurrentPassword: async ({ currentPassword, newPassword }) => {
+        try {
+          const payload = { currentPassword, newPassword };
+          const { data } = await api.put('/users/update-password', payload);
+          return data;
+        } catch (err) {
+          throw err;
+        }
+      },
+
+      serverLogout: async () => {
+        try {
+          await api.post('/users/logout');
+        } catch (err) {
+          // ignore server error on logout; proceed with local logout
+        } finally {
+          get().logout();
+        }
+      },
+
       // -------------------- LOGIN --------------------
       login: async (email, password) => {
         try {
@@ -53,6 +107,10 @@ export const useAuthStore = create(
           localStorage.setItem("user", JSON.stringify(user));
 
           set({ user, token, loading: false });
+          // Admin-side logic: redirect admins/superadmins to the admin dashboard
+          if (user?.role === 'admin' || user?.role === 'superadmin') {
+            window.location.href = '/admin';
+          }
           return user;
         } catch (err) {
           console.error("Login failed:", err.response?.data || err.message);

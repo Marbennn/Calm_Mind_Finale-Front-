@@ -1,6 +1,7 @@
 // src/utils/adminAnalytics.js
 import { deriveStatus, taskDateYMD } from './analyticsData';
 import { toDate } from './dateHelpers';
+import api from '../api/client';
 
 /**
  * adminAnalytics utilities
@@ -9,53 +10,16 @@ import { toDate } from './dateHelpers';
 
 // Fetch aggregated data for all users
 export async function fetchGlobalAnalytics(dateRange = {}) {
-  // TODO: Replace with actual API calls
   try {
-    // In development, return mock data if the API call fails
-    try {
-      // Ensure we send ISO date strings to the backend
-      const body = {
-        start: dateRange.start && dateRange.start.toISOString ? dateRange.start.toISOString() : dateRange.start,
-        end: dateRange.end && dateRange.end.toISOString ? dateRange.end.toISOString() : dateRange.end,
-      };
-
-      const response = await fetch('/api/admin/analytics', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) throw new Error('API request failed');
-      // parse JSON safely
-      try {
-        return await response.json();
-      } catch (parseErr) {
-        console.warn('Failed to parse analytics response JSON, falling back to mock', parseErr);
-        throw parseErr;
-      }
-    } catch (apiError) {
-      console.info('API not available or failed, using mock data:', apiError);
-      // Mock data for development
-      return {
-        tasks: [
-          { id: 1, title: "Task 1", priority: "High", status: "completed", date: dateRange.start },
-          { id: 2, title: "Task 2", priority: "Medium", status: "in_progress", date: dateRange.start },
-          { id: 3, title: "Task 3", priority: "Low", status: "todo", date: dateRange.end },
-          { id: 4, title: "Task 4", priority: "High", status: "completed", date: dateRange.end },
-        ],
-        stressLogs: [
-          { ts: dateRange.start, level: 3, tags: ["Time Pressure", "Workload"] },
-          { ts: dateRange.end, level: 2, tags: ["Complexity"] },
-        ]
-      };
-    }
-  } catch (error) {
-    console.error('Error in fetchGlobalAnalytics:', error);
-    return {
-      tasks: [],
-      stressLogs: []
+    const body = {
+      start: dateRange.start && dateRange.start.toISOString ? dateRange.start.toISOString() : dateRange.start,
+      end: dateRange.end && dateRange.end.toISOString ? dateRange.end.toISOString() : dateRange.end,
     };
+    const { data } = await api.post('/admin/analytics', body);
+    return data || { tasks: [], stressLogs: [] };
+  } catch (error) {
+    console.error('Error in fetchGlobalAnalytics:', error?.response?.data || error?.message);
+    throw error;
   }
 }
 

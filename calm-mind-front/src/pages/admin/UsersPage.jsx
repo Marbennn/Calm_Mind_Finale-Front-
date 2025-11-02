@@ -2,36 +2,24 @@ import React, { useState, useEffect } from 'react';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import AdminHeader from '../../components/admin/AdminHeader';
 import { SearchIcon, X } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 
 const UsersPage = () => {
-  const [users, setUsers] = useState([]);
+  const { users, usersLoading, usersError, fetchAllUsers } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredUsers, setFilteredUsers] = useState([]);
 
-  // Mock data - Replace with actual API call
   useEffect(() => {
-    // TODO: Replace with actual API call
-    const mockUsers = [
-      {
-        studentId: '2023-0001',
-        name: 'John Doe',
-        yearLevel: '3rd Year',
-        department: 'Computer Science',
-        course: 'BS Computer Science',
-        role: 'Student'
-      },
-      // Add more mock data as needed
-    ];
-    setUsers(mockUsers);
-    setFilteredUsers(mockUsers);
-  }, []);
+    fetchAllUsers();
+  }, [fetchAllUsers]);
 
   // Handle search
   useEffect(() => {
-    const filtered = users.filter(user => 
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.studentId.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filtered = (users || []).filter(user => {
+      const name = (user?.name || [user?.firstName, user?.lastName].filter(Boolean).join(' ')).toLowerCase();
+      const sid = (user?.studentId || '').toString().toLowerCase();
+      return name.includes(searchQuery.toLowerCase()) || sid.includes(searchQuery.toLowerCase());
+    });
     setFilteredUsers(filtered);
   }, [searchQuery, users]);
 
@@ -44,7 +32,7 @@ const UsersPage = () => {
           <div className="flex justify-between items-center mb-6">
             <div className="text-sm text-gray-600">
               <span className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-gray-800 font-medium">
-                Total: {users.length}
+                Total: {users?.length || 0}
               </span>
             </div>
           </div>
@@ -89,7 +77,15 @@ const UsersPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredUsers.length === 0 ? (
+                  {usersLoading ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-4 text-sm text-gray-500 text-center">Loading users...</td>
+                    </tr>
+                  ) : usersError ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-4 text-sm text-red-500 text-center">{usersError}</td>
+                    </tr>
+                  ) : filteredUsers.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-4 text-sm text-gray-500 text-center">
                         No users found.
@@ -98,12 +94,12 @@ const UsersPage = () => {
                   ) : (
                     filteredUsers.map((user, index) => (
                       <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.studentId}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.yearLevel}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.department}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.course}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.role}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user?.studentId || user?.id || user?._id}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user?.name || [user?.firstName, user?.lastName].filter(Boolean).join(' ')}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user?.yearLevel || user?.level || (user?.profile && user?.profile.level) || ''}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user?.department || (user?.profile && user?.profile.department) || ''}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user?.course || ''}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user?.role}</td>
                       </tr>
                     ))
                   )}

@@ -31,7 +31,9 @@ export function normalizeStatus(s) {
 export function deriveStatus(t) {
   const base = normalizeStatus(t.status);
   if (base === "completed") return "completed";
-  if (isPast(t.dueDate))   return "missing";
+  // Accept alternate date keys from backend payloads
+  const dueYmd = t.dueDate || t.due_date || t.date;
+  if (isPast(dueYmd))   return "missing";
   if (base === "missing")  return "todo";
   return base; // 'todo' | 'in_progress'
 }
@@ -44,8 +46,12 @@ export function isPast(yyyy_mm_dd) {
 }
 
 export function taskDateYMD(t) {
+  // Accept multiple possible keys
   if (t.dueDate) return t.dueDate;
   if (t.startDate) return t.startDate;
+  if (t.due_date) return t.due_date;
+  if (t.start_date) return t.start_date;
+  if (t.date) return String(t.date).slice(0,10);
   const idNum = Number(t.id);
   if (Number.isFinite(idNum)) return new Date(idNum).toISOString().slice(0,10);
   return null;

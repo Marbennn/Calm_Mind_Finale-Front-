@@ -63,7 +63,15 @@ function readStressLogs() {
   return [];
 }
 
-const USER_ID = "69008a1fd3c8660f1ff28779";
+// Resolve current user id from localStorage (set by auth flows)
+function getCurrentUserId() {
+  try {
+    const u = JSON.parse(localStorage.getItem("user"));
+    return u?._id || u?.id || localStorage.getItem("userId") || null;
+  } catch {
+    return localStorage.getItem("userId") || null;
+  }
+}
 
 export default function HomePage() {
   const { theme, setTheme } = useContext(ThemeContext);
@@ -83,7 +91,9 @@ export default function HomePage() {
   const [tasks, setTasks] = useState([]);
   const fetchTasks = async () => {
     try {
-      const res = await api.get(`/tasks?user_id=${USER_ID}`);
+      const uid = getCurrentUserId();
+      if (!uid) return; // no user yet; skip
+      const res = await api.get(`/tasks?user_id=${uid}`);
       const mapped = (res.data || []).map((t) => ({
         id: t._id,
         title: t.title,

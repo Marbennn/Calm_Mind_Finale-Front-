@@ -171,12 +171,12 @@ const useStressStore = create((set, get) => ({
       .map(t => t.stress);
     const totalStress = activeStress.reduce((a, b) => a + b, 0);
     const maxStress = activeStress.length; // each active task maxes at 1.0 in this model
-    const averageStress = maxStress > 0 ? Number(((totalStress / maxStress) * 100).toFixed(1)) : 0; // 0..100
+    const averageStress = maxStress > 0 ? Math.round((totalStress / maxStress) * 100) : 0; // integer 0..100
 
     // Task-management total stress snapshot (sum over active tasks)
     const totalStressTask = activeStress.reduce((a, b) => a + b, 0); // 0..N (since each per-task stress is 0..1)
     const maxStressTask = activeStress.length; // each active task maxes at 1.0 in this model
-    const totalStressPercent = maxStressTask > 0 ? Number(((totalStressTask / maxStressTask) * 100).toFixed(1)) : 0;
+    const totalStressPercent = maxStressTask > 0 ? Math.round((totalStressTask / maxStressTask) * 100) : 0;
 
     // Calculate stress by category
     const categories = ['todo', 'in_progress', 'missing', 'completed'];

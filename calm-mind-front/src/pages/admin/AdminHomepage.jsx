@@ -1,6 +1,6 @@
 // src/pages/admin/AdminHomepage.temp.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import Card from "../../components/HoverCard";
 import PriorityChart from "../../components/analytics/PriorityChart";
@@ -11,6 +11,9 @@ import StressorPie from "../../components/analytics/StressorPie";
 import PredictiveTrend from "../../components/analytics/PredictiveTrend";
 import FilterCard from "../../components/analytics/FilterCard";
 import KpiCards from "../../components/analytics/KpiCards";
+import DepartmentPie from "../../components/analytics/DepartmentPie";
+import { useAuthStore } from "../../store/authStore";
+
 import {
   buildPeriods,
   toDate,
@@ -70,6 +73,7 @@ export default function AdminHomepage() {
   const [tasks, setTasks] = useState([]);
   const [stressLogs, setStressLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { users, fetchAllUsers, serverLogout } = useAuthStore();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -93,6 +97,10 @@ export default function AdminHomepage() {
     const interval = setInterval(fetchData, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [range.start, range.end]);
+
+  useEffect(() => {
+    fetchAllUsers();
+  }, [fetchAllUsers]);
 
   /* ---------- data slices ---------- */
   const tasksForSnapshot = useMemo(() => {
@@ -136,6 +144,15 @@ export default function AdminHomepage() {
   // kept for reference; PredictiveTrend component uses tasksForTimeSeries/stressSeriesByMode/periods directly
   const _predictiveTrends = useMemo(() => calculateGlobalPredictiveTrends(tasksForTimeSeries, stressInRange, periods), [tasksForTimeSeries, stressInRange, periods]);
 
+  const deptData = useMemo(() => {
+    const counts = {};
+    (users || []).forEach((u) => {
+      const d = (u && (u.department || (u.profile && u.profile.department))) || "Unknown";
+      counts[d] = (counts[d] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [users]);
+
   /* ---------- render ---------- */
   return (
     <div className="min-h-screen h-screen">
@@ -149,8 +166,8 @@ export default function AdminHomepage() {
                 <div className="flex items-center gap-3">
                   <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard (All Students)</h1>
                 </div>
-                <div className="text-xs text-gray-500 md:ml-4">
-                  Tips: Adjust the date range and period to see trends update live.
+                <div className="flex items-center gap-3">
+                  <div className="text-xs text-gray-500 md:ml-4">Tips: Adjust the date range and period to see trends update live.</div>
                 </div>
               </Card>
             </div>
@@ -182,6 +199,7 @@ export default function AdminHomepage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <PriorityChart data={priorityPieData} />
                   <StatusChart data={statusBarData} />
+                  <DepartmentPie data={deptData} />
                   <StressOverTime periods={periods} series={stressSeriesByMode} />
                   <WorkloadVsStress data={workloadVsStress} />
                   <StressorPie data={tagsForPie} />

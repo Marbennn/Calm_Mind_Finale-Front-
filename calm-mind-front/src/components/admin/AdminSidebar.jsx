@@ -6,7 +6,6 @@ import { useAuthStore } from "../../store/authStore";
 
 const adminMenu = [
   { label: "Dashboard", icon: "chart", href: "/admin" },
-  { label: "Users", icon: "users", href: "/admin/users" },
   { label: "Reports", icon: "reports", href: "/admin/reports" },
   { label: "Sign Out", icon: "logout", href: "#" },
 ];
@@ -59,14 +58,13 @@ function Icon({ name, active }) {
 
 export default function AdminSidebar({ active }) {
   const { theme, setTheme } = useContext(ThemeContext);
-  const { clearAuth } = useAuthStore();
+  const { serverLogout, logout } = useAuthStore();
   const location = useLocation();
   const path = location?.pathname || "/admin";
 
   const handleSignOut = () => {
-    clearAuth(); // Clear auth store
-    localStorage.removeItem("token"); // Clear token from localStorage
-    window.location.href = "/login"; // Redirect to login
+    // Prefer server logout; fallback to local logout
+    try { serverLogout?.(); } catch { logout?.(); }
   };
 
   return (
