@@ -23,7 +23,6 @@ import AdminHomepage from "./pages/admin/AdminHomepage";
 import { useAuthStore } from "./store/authStore";
 import api from "./api/client";
 
-/* Fully ProtectedRoute Component */
 const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
   const { token, logout } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
@@ -33,7 +32,6 @@ const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
     const verifyToken = async () => {
       const localToken = token || localStorage.getItem("token");
 
-      // No token — instantly redirect
       if (!localToken) {
         logout();
         setIsValid(false);
@@ -42,7 +40,6 @@ const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
       }
 
       try {
-        // Verify with backend
         const res = await api.get("http://localhost:4000/api/users/profile", {
           headers: { Authorization: `Bearer ${localToken}` },
         });
@@ -68,7 +65,6 @@ const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
     verifyToken();
   }, [token, logout]);
 
-  // While verifying — prevent flicker
   if (isChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen text-gray-500">
@@ -77,16 +73,13 @@ const ProtectedRoute = ({ children, redirectTo = "/login" }) => {
     );
   }
 
-  // Redirect to login if invalid
   if (!isValid) {
     return <Navigate to={redirectTo} replace />;
   }
 
-  // Render protected page
   return children;
 };
 
-/* Placeholder Admin Pages */
 function UsersPage() {
   return <div>Users Page (Under Construction)</div>;
 }
@@ -117,16 +110,37 @@ function NotFoundPage() {
 
 /* Main App */
 function App() {
-  const { token: storeToken, user } = useAuthStore();
+  const { token: storeToken, user, logout } = useAuthStore();
   const token = storeToken || localStorage.getItem("token");
   const isAdmin = user?.role === "admin";
+
+  useEffect(() => {
+    const handleStorageChange = (event) => {
+      if (event.key === "token") {
+        if (!event.newValue) {
+          logout();
+        } else if (event.newValue && !storeToken) {
+          window.location.href = "/home";
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [logout, storeToken]);
 
   return (
     <ThemeProvider>
       <Router>
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<SignupScreen />} />
+          {/* Default / Public Routes */}
+          <Route
+            path="/"
+            element={token ? <Navigate to="/home" replace /> : <SignupScreen />}
+          />
           <Route path="/login" element={<LoginScreen />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
@@ -204,7 +218,7 @@ function App() {
             }
           />
 
-          {/* Admin Routes (requires valid token + admin role) */}
+          {/* Admin Routes */}
           <Route
             path="/admin"
             element={
