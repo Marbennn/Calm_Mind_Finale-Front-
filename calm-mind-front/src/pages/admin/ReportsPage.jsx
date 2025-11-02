@@ -1,8 +1,7 @@
 // src/pages/admin/ReportsPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import AdminSidebar from "../../components/admin/AdminSidebar";
-import Card from "../../components/HoverCard";
-import FilterCard from "../../components/analytics/FilterCard";
+// import Card from "../../components/HoverCard"; // UI switched to match Dashboard header (no logic change)
 import { useAuthStore } from "../../store/authStore";
 import { toDate, addDays, fmtYMD, buildPeriods } from "../../utils/dateHelpers";
 import { deriveStatus, taskDateYMD } from "../../utils/analyticsData";
@@ -10,7 +9,7 @@ import { fetchGlobalAnalytics } from "../../utils/adminAnalytics";
 import api from "../../api/client";
 
 export default function ReportsPage() {
-  /* ---------- filters ---------- */
+  /* ---------- filters (unchanged logic) ---------- */
   const today = toDate(new Date());
   const defaultStart = addDays(today, -29);
   const [dateFrom, setDateFrom] = useState(() => localStorage.getItem("an_from") || fmtYMD(defaultStart));
@@ -28,13 +27,10 @@ export default function ReportsPage() {
     return { start: s, end: e };
   }, [dateFrom, dateTo]);
 
-  const periods = useMemo(
-    () => buildPeriods(range.start, range.end, periodMode),
-    [range, periodMode]
-  );
+  const periods = useMemo(() => buildPeriods(range.start, range.end, periodMode), [range, periodMode]);
 
-  /* ---------- data ---------- */
-  const { users, fetchAllUsers, serverLogout } = useAuthStore();
+  /* ---------- data (unchanged logic) ---------- */
+  const { users, fetchAllUsers } = useAuthStore();
   const [tasks, setTasks] = useState([]);
   const [stressLogs, setStressLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,34 +45,36 @@ export default function ReportsPage() {
         const data = await fetchGlobalAnalytics({ start: range.start, end: range.end });
         setTasks(data?.tasks || []);
         setStressLogs(data?.stressLogs || []);
-        // Fetch profiles via admin batch endpoint only
+
+        // Fetch profiles via admin batch endpoint only (unchanged)
         const list = Array.isArray(users) ? users : [];
         const ids = list.map((u) => u?._id || u?.id || u?.userId).filter(Boolean);
         let map = new Map();
         try {
           if (ids.length) {
-            const { data: batch } = await api.post('/admin/profiles/batch', { ids });
+            const { data: batch } = await api.post("/admin/profiles/batch", { ids });
             const profiles = Array.isArray(batch?.profiles) ? batch.profiles : [];
             map = new Map(
               profiles
                 .map((p) => {
                   const uid = p?.userId?._id || p?.userId || null;
                   if (!uid) return null;
-                  return [uid, {
-                    department: p.department || "",
-                    yearLevel: p.yearLevel || "",
-                    studentNumber: p.studentNumber || "",
-                    fullName: p.fullName || [p.firstName, p.lastName].filter(Boolean).join(" ")
-                  }];
+                  return [
+                    uid,
+                    {
+                      department: p.department || "",
+                      yearLevel: p.yearLevel || "",
+                      studentNumber: p.studentNumber || "",
+                      fullName: p.fullName || [p.firstName, p.lastName].filter(Boolean).join(" "),
+                    },
+                  ];
                 })
                 .filter(Boolean)
             );
           }
         } catch {
-          // If batch fails, proceed with empty map; UI will show blanks for missing profiles
           map = new Map();
         }
-
         setProfilesMap(map);
       } catch (e) {
         console.error("Failed to load analytics for reports", e);
@@ -86,10 +84,9 @@ export default function ReportsPage() {
     load();
   }, [range.start, range.end, users]);
 
-  /* ---------- rows ---------- */
+  /* ---------- rows (unchanged logic) ---------- */
   const rows = useMemo(() => {
     const toKey = (u) => u?.id || u?._id || u?.userId;
-
     const usersMap = new Map((users || []).map((u) => [toKey(u), u]));
 
     const tasksByUser = new Map();
@@ -128,15 +125,16 @@ export default function ReportsPage() {
       let completedOnTime = 0;
       let overdue = 0;
       utasks.forEach((t) => {
-        const st = deriveStatus(t); // returns 'completed' | 'missing' | 'in_progress' | 'todo'
+        const st = deriveStatus(t); // 'completed' | 'missing' | 'in_progress' | 'todo'
         const dueRaw = t?.dueDate || t?.due_date || t?.date || null;
         const doneRaw = t?.completedAt || t?.completed_at || null;
-        const due = dueRaw ? toDate(String(dueRaw).slice(0,10)) : null;
+        const due = dueRaw ? toDate(String(dueRaw).slice(0, 10)) : null;
         const done = doneRaw ? new Date(doneRaw) : null;
 
         if (st === "completed") {
           if (due && done) {
-            if (done <= due) completedOnTime += 1; else overdue += 1;
+            if (done <= due) completedOnTime += 1;
+            else overdue += 1;
           } else {
             completedOnTime += 1;
           }
@@ -161,18 +159,18 @@ export default function ReportsPage() {
     return r;
   }, [users, tasks, stressLogs, range.start, range.end]);
 
-  /* ---------- export ---------- */
+  /* ---------- export (unchanged logic) ---------- */
   const onExport = () => {
     const headers = [
-      "Student ID","Name","Level","Department","Total Task","Total Stress","On-time Task Rate","Overdue Task Rate"
+      "Student ID", "Name", "Level", "Department", "Total Task", "Total Stress", "On-time Task Rate", "Overdue Task Rate",
     ];
     const lines = [headers.join(",")];
     rows.forEach((r) => {
       const line = [
         r.studentId,
-        (r.name || "").toString().replaceAll(","," "),
+        (r.name || "").toString().replaceAll(",", " "),
         r.level || "",
-        (r.department || "").toString().replaceAll(","," "),
+        (r.department || "").toString().replaceAll(",", " "),
         r.totalTasks ?? 0,
         r.totalStress ?? 0,
         (r.onTimeRate ?? 0) + "%",
@@ -189,42 +187,106 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   };
 
-  /* ---------- render ---------- */
+  /* ---------- render (header + filters match Dashboard UI) ---------- */
   return (
-    <div className="min-h-screen h-screen">
-      <div className="h-full w-full flex">
+    <div className="min-h-screen h-screen overflow-hidden">
+      <div className="h-full w-full flex overflow-hidden">
         <AdminSidebar active={"Reports"} />
-        <div className="flex-1 flex flex-col min-h-0">
-          {/* Header */}
-          <div className="sticky top-0 z-20 bg-transparent">
-            <div className="mb-3 mt-2 px-2">
-              <Card className="w-full px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 hover:shadow-none hover:-translate-y-0 hover:bg-inherit cursor-default">
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold tracking-tight">Admin Reports</h1>
+
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Header — EXACT same shell as Dashboard (no icon buttons) */}
+          <div className="col-span-12">
+            <div className="h-20 md:h-[80px] w-full px-4 flex items-center justify-between bg-card rounded-xl shadow-md cursor-default mt-2 mx-2">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Admin Reports</h1>
+
+              <div className="flex items-center gap-2">
+                <div className="hidden md:block text-xs text-gray-500 mr-2">
+                  Tips: Adjust the date range and period to refine the report.
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={onExport} className="px-3 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-50">Export CSV</button>
-                </div>
-              </Card>
+                <button
+                  onClick={onExport}
+                  className="px-4 py-2 rounded-xl bg-black text-amber-400 font-medium hover:bg-black/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
+                >
+                  Export CSV
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="px-2 mb-4">
-            <FilterCard
-              dateFrom={dateFrom}
-              onChangeFrom={setDateFrom}
-              dateTo={dateTo}
-              onChangeTo={setDateTo}
-              periodMode={periodMode}
-              onChangeMode={setPeriodMode}
-              groupBy={"None"}
-              onChangeGroupBy={() => {}}
-            />
-          </div>
+          {/* Body scroller (same paddings as Dashboard/Analytics) */}
+          <div className="an-scroll flex-1 overflow-y-auto overflow-x-hidden px-2 pb-24 pt-2 overscroll-contain">
+            {/* Filter toolbar — matches Dashboard UI (no logic changes) */}
+            <div className="w-full mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* From */}
+                <div className="flex flex-col">
+                  <label className="text-[11px] text-gray-500 mb-1">From</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={(e) => e.target.value && setDateFrom(e.target.value)}
+                    className="rounded-xl border border-gray-200 bg-white/70 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
 
-          {/* Table */}
-          <div className="flex-1 overflow-y-auto px-2 pb-24">
+                {/* To */}
+                <div className="flex flex-col">
+                  <label className="text-[11px] text-gray-500 mb-1">To</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(e) => e.target.value && setDateTo(e.target.value)}
+                    className="rounded-xl border border-gray-200 bg-white/70 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+
+                {/* Period */}
+                <div className="flex flex-col">
+                  <label className="text-[11px] text-gray-500 mb-1">Period</label>
+                  <select
+                    value={periodMode}
+                    onChange={(e) => setPeriodMode(e.target.value)}
+                    className="rounded-xl border border-gray-200 bg-white/70 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+
+                {/* Quick actions */}
+                <div className="flex items-end gap-2">
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded-xl bg-black text-amber-400 font-medium hover:bg-black/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
+                    onClick={() => {
+                      /* filters are reactive; button kept for UX parity */
+                    }}
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50"
+                    onClick={() => {
+                      const defFrom = fmtYMD(addDays(toDate(new Date()), -29));
+                      const defTo = fmtYMD(toDate(new Date()));
+                      setDateFrom(defFrom);
+                      setDateTo(defTo);
+                      setPeriodMode("daily");
+                    }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">Use the date inputs to update the range.</div>
+            </div>
+
+            {/* Table (unchanged logic) */}
             {loading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
@@ -248,7 +310,9 @@ export default function ReportsPage() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {rows.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-6 py-4 text-sm text-gray-500 text-center">No data for this period.</td>
+                          <td colSpan={8} className="px-6 py-4 text-sm text-gray-500 text-center">
+                            No data for this period.
+                          </td>
                         </tr>
                       ) : (
                         rows.map((r, i) => (
@@ -272,6 +336,16 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
+
+      {/* Hide scrollbar to match Dashboard/Analytics */}
+      <style>{`
+        .an-scroll { 
+          scrollbar-width: none;
+        }
+        .an-scroll::-webkit-scrollbar {
+          width: 0; height: 0;
+        }
+      `}</style>
     </div>
   );
 }
