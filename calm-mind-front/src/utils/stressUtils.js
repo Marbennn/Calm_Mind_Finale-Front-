@@ -215,3 +215,81 @@ export function buildChatbotReply(tasks, dailyStress) {
 
   return `Stress: ${p}% (${label}). Due soon: ${dueSoon}. Overdue: ${overdue}. Next deadlines: ${nextTxt}. ${guidance}`;
 }
+
+// -------------------- Time-based helpers --------------------
+// Parse simple natural language time phrases into Luxon ranges
+export function parseTimeRange(text) {
+  const now = DateTime.now();
+  if (!text || typeof text !== 'string') return null;
+  const t = text.toLowerCase().trim();
+
+  // Today
+  if (t.includes('today')) {
+    return { start: now.startOf('day'), end: now.endOf('day'), label: 'today' };
+  }
+
+  // This week / last week
+  if (t.includes('this week')) {
+    return { start: now.startOf('week'), end: now.endOf('week'), label: 'this week' };
+  }
+  if (t.includes('last week')) {
+    const start = now.startOf('week').minus({ weeks: 1 });
+    return { start, end: start.endOf('week'), label: 'last week' };
+  }
+
+  // This month / last month
+  if (t.includes('this month')) {
+    return { start: now.startOf('month'), end: now.endOf('month'), label: 'this month' };
+  }
+  if (t.includes('last month')) {
+    const start = now.startOf('month').minus({ months: 1 });
+    return { start, end: start.endOf('month'), label: 'last month' };
+  }
+
+  // Specific month name (e.g., "november" or "in november") - assume current year
+  const monthMatch = t.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i);
+  if (monthMatch) {
+    const monthName = monthMatch[1];
+    const dt = DateTime.fromFormat(`1 ${monthName} ${now.year}`, 'd LLLL yyyy');
+    if (dt.isValid) {
+      return { start: dt.startOf('month'), end: dt.endOf('month'), label: monthName.charAt(0).toUpperCase() + monthName.slice(1) };
+    }
+  }
+
+  // Fallback: null (meaning no specific range parsed)
+  return null;
+}
+
+// Summarize tasks for a given Luxon range. Returns concise stats object.
+export function summarizeTasksInRange(tasks = [], range) {
+  if (!range || !range.start || !range.end) return null;
+  const start = range.start;
+  const end = range.end;
+  const now = DateTime.now();
+
+  // Filter tasks by due_date that falls within [start, end]
+  const filtered = (tasks || []).filter(t => {
+    if (!t || !t.due_date) return false;
+    const d = DateTime.fromISO(t.due_date);
+    return d.isValid && d >= start.startOf('day') && d <= end.endOf('day');
+  });
+
+  const total = filtered.length;
+  const completed = filtered.filter(t => t.completed || t.status === 'completed').length;
+  const pending = filtered.filter(t => !t.completed && t.status !== 'completed').length;
+  const overdue = filtered.filter(t => !t.completed && DateTime.fromISO(t.due_date) < now).length;
+  const missing = filtered.filter(t => t.status === 'missing').length;
+
+  const daily = calculateDailyStress(filtered);
+
+  return {
+    total,
+    completed,
+    pending,
+    overdue,
+    missing,
+    tasks: filtered,
+    daily,
+    label: range.label || `${start.toFormat('MMM dd')} - ${end.toFormat('MMM dd')}`,
+  };
+}

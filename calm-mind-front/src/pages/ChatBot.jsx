@@ -5,7 +5,7 @@ dayjs.extend(relativeTime);
 import Sidebar from "../components/Sidebar";
 import api from "../api/client";
 import useStressStore from "../store/useStressStore";
-import { calculateDailyStress, buildChatbotReply } from "../utils/stressUtils";
+import { calculateDailyStress, buildChatbotReply, parseTimeRange, summarizeTasksInRange } from "../utils/stressUtils";
 import { ThemeContext } from "../context/ThemeContext";
 
 /* ======================== Constants ======================== */
@@ -14,22 +14,19 @@ const LS_THREADS = "cm_threads_v1"; // [{id,title,createdAt,updatedAt,messages:[
 const USER_ID = "69008a1fd3c8660f1ff28779";
 
 /* ======================== AI Response Engine ======================== */
-async function getBotResponse(userInput, currentTasks) {
+async function getBotResponse(userInput, currentTasks, storeSummary = null) {
   const daily = calculateDailyStress(currentTasks || []);
-  const percent = Math.round(daily.percent || 0);
+  const storeAvg = storeSummary?.average ?? null; // 0..1
+  const storePercent = storeAvg !== null ? Math.round(storeAvg * 100) : Math.round(daily.percent || 0);
 
   const askContext = /how stressed am i|reminders|what tasks do i have|summary|overview|due|overdue|next deadlines/i.test(
     userInput
   );
   if (askContext) {
+    // Use the store-derived percentage for immediate, accurate response
     try {
-      const { data } = await api.get(`/coach/context?user_id=${USER_ID}`);
-      const ctx = data || {};
-      const pctFromCtx = Number.isFinite(+ctx.stress?.percentage)
-        ? Math.round(+ctx.stress.percentage)
-        : percent;
       const reply = buildChatbotReply(currentTasks || [], daily);
-      return `📊 Current Stress: ${pctFromCtx}%.\n${reply}`;
+      return `📊 Current Stress: ${storePercent}%.\n${reply}`;
     } catch {
       return buildChatbotReply(currentTasks || [], daily);
     }
@@ -39,6 +36,9 @@ async function getBotResponse(userInput, currentTasks) {
     const { data } = await api.post("/coach/chat", {
       user_id: USER_ID,
       message: userInput,
+      // include authoritative stress/workload info so backend LLM uses exact values
+      stress: { percentage: storePercent },
+      workload: { total: (currentTasks || []).length },
     });
     const coachData = data || {};
     let replyText = coachData.response || coachData.response?.response || "";
@@ -50,7 +50,7 @@ async function getBotResponse(userInput, currentTasks) {
     if (!replyText || !replyText.trim()) {
       return buildChatbotReply(currentTasks || [], daily);
     }
-    return `📊 Current Stress: ${percent}%.\n${replyText}${stepsText}`;
+    return `📊 Current Stress: ${storePercent}%.\n${replyText}${stepsText}`;
   } catch {
     return buildChatbotReply(currentTasks || [], daily);
   }
@@ -171,7 +171,11 @@ export default function ChatBot() {
   });
 
   const [currentId, setCurrentId] = useState(() => threads[0]?.id);
-  const currentThread = threads.find((t) => t.id === currentId) || threads[0];
+  // Memoize currentThread to prevent unnecessary re-renders
+  const currentThread = useMemo(
+    () => threads.find((t) => t.id === currentId) || threads[0],
+    [threads, currentId]
+  );
   const [messages, setMessages] = useState(
     currentThread?.messages || [defaultGreetingMsg()]
   );
@@ -207,11 +211,20 @@ export default function ChatBot() {
     });
   };
 
-  // Persist current thread
+  // Sync messages when current thread changes
   useEffect(() => {
+    if (!currentThread?.messages) return;
+    setMessages(currentThread.messages);
+  }, [currentThread?.messages]);
+
+  // Persist thread updates to localStorage
+  useEffect(() => {
+    if (!currentThread?.id) return;
+
+    // Only update if messages have changed for this thread
     setThreads((prev) => {
       const list = prev.map((t) =>
-        t.id === currentThread?.id
+        t.id === currentThread.id
           ? { ...t, messages, updatedAt: new Date().toISOString() }
           : t
       );
@@ -219,12 +232,6 @@ export default function ChatBot() {
       return list;
     });
   }, [messages, currentThread?.id]);
-
-  // Sync messages on thread change
-  useEffect(() => {
-    if (!currentThread) return;
-    setMessages(currentThread.messages);
-  }, [currentThread?.id]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -240,6 +247,48 @@ export default function ChatBot() {
   /* ---------- Command processor (quick local commands) ---------- */
   const processCommand = async (text) => {
     const t = text.trim();
+    // Time-based queries (e.g., "How many tasks do I have in November?", "Did I complete last week?")
+    try {
+      const timeMatch = t.match(/(today|this week|this month|last week|last month|in \s*(?:january|february|march|april|may|june|july|august|september|october|november|december))/i);
+      if (timeMatch) {
+        const range = parseTimeRange(timeMatch[0]);
+        const summary = summarizeTasksInRange(tasks, range);
+        if (summary) {
+          // Completed-focused question
+          if (/complete|completed|did i complete|how many did i complete/i.test(t)) {
+            pushMessage(
+              "assistant",
+              `${summary.completed} tasks completed ${summary.label}.`
+            );
+            return true;
+          }
+
+          // Missing tasks question
+          if (/missing|missing tasks/i.test(t)) {
+            const missingList = summary.tasks.filter(x => x.status === 'missing');
+            if (!missingList.length) {
+              pushMessage("assistant", `You have no missing tasks ${summary.label}.`);
+            } else {
+              const list = missingList.map((m, i) => `${i + 1}. ${m.title}`).join("\n");
+              pushMessage("assistant", `Missing tasks ${summary.label}:\n${list}`);
+            }
+            return true;
+          }
+
+          // General count/time query
+          if (/how many tasks|tasks do i have|tasks in|tasks this|how many are pending|how many are due/i.test(t)) {
+            pushMessage(
+              "assistant",
+              `${summary.total} tasks ${summary.label}: ${summary.pending} pending, ${summary.completed} completed, ${summary.overdue} overdue.`
+            );
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      // Non-fatal - fallthrough to other handlers
+      console.error('Time-query parse error', e);
+    }
     const m1 = t.match(/mark task (\d+) as complete/i);
     if (m1) {
       const idx = parseInt(m1[1], 10) - 1;
@@ -356,7 +405,7 @@ export default function ChatBot() {
         typeof lastStressRef.current === "number"
           ? lastStressRef.current
           : getDailyStressSummary().average;
-      const response = await getBotResponse(trimmed, tasks);
+  const response = await getBotResponse(trimmed, tasks, getDailyStressSummary());
       const after = getDailyStressSummary().average;
       let finalResp = response;
       if (typeof live === "number" && typeof after === "number") {
@@ -377,28 +426,7 @@ export default function ChatBot() {
     }
   };
 
-  /* ---------- Mini-dashboard data & quick actions ---------- */
-  const dashboard = useMemo(() => {
-    const daily = getDailyStressSummary
-      ? getDailyStressSummary()
-      : { average: 0, normalized: 0, total: 0 };
-    const total = (tasks || []).length;
-    const overdue = (tasks || []).filter(
-      (x) => !x.completed && x.due_date && new Date(x.due_date) < new Date()
-    ).length;
-    const top = getMostStressfulTasks ? getMostStressfulTasks(3) : [];
-    return { daily, total, overdue, top };
-  }, [tasks, getDailyStressSummary, getMostStressfulTasks]);
-
-  const handleQuickComplete = async (task) => {
-    if (!task) return;
-    try {
-      await updateTask(task.id || task._id, { status: "completed" });
-      pushMessage("assistant", `Quick action: marked "${task.title}" as complete.`);
-    } catch {
-      pushMessage("assistant", `Could not complete "${task.title}". Try again.`);
-    }
-  };
+  /* (mini-dashboard + quick actions removed - not used in chat view) */
 
   /* ======================== UI ======================== */
   return (
