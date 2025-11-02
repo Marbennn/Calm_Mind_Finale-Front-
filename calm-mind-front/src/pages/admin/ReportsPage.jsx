@@ -153,8 +153,9 @@ export default function ReportsPage() {
         return d >= s && d <= e;
       });
       const totalStress = ustress.reduce((sum, sl) => sum + (Number(sl?.level) || 0), 0);
+      const totalTasks = utasks.length;
 
-      r.push({ studentId, name, level, department, totalStress, onTimeRate, overdueRate });
+      r.push({ studentId, name, level, department, totalTasks, totalStress, onTimeRate, overdueRate });
     });
 
     return r;
@@ -163,7 +164,7 @@ export default function ReportsPage() {
   /* ---------- export ---------- */
   const onExport = () => {
     const headers = [
-      "Student ID","Name","Level","Department","Total Stress","On-time Task Rate","Overdue Task Rate"
+      "Student ID","Name","Level","Department","Total Task","Total Stress","On-time Task Rate","Overdue Task Rate"
     ];
     const lines = [headers.join(",")];
     rows.forEach((r) => {
@@ -172,6 +173,7 @@ export default function ReportsPage() {
         (r.name || "").toString().replaceAll(","," "),
         r.level || "",
         (r.department || "").toString().replaceAll(","," "),
+        r.totalTasks ?? 0,
         r.totalStress ?? 0,
         (r.onTimeRate ?? 0) + "%",
         (r.overdueRate ?? 0) + "%",
@@ -237,6 +239,7 @@ export default function ReportsPage() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Level</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Task</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Stress</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">On-time Task Rate</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overdue Task Rate</th>
@@ -254,6 +257,7 @@ export default function ReportsPage() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.name}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.level}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.department}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.totalTasks}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.totalStress}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.onTimeRate}%</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.overdueRate}%</td>
