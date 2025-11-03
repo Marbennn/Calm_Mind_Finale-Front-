@@ -5,7 +5,13 @@ dayjs.extend(relativeTime);
 import Sidebar from "../components/Sidebar";
 import api from "../api/client";
 import useStressStore from "../store/useStressStore";
-import { calculateDailyStress, buildChatbotReply, parseTimeRange, summarizeTasksInRange } from "../utils/stressUtils";
+import {
+  calculateDailyStress,
+  buildChatbotReply,
+  parseTimeRange,
+  summarizeTasksInRange,
+  generateAIRecommendations,
+} from "../utils/stressUtils";
 import { ThemeContext } from "../context/ThemeContext";
 
 /* ======================== Constants ======================== */
@@ -83,9 +89,12 @@ export default function ChatBot() {
       const d = e?.detail;
       if (d && typeof d.averageStress === "number") {
         lastStressRef.current = d.averageStress;
-        setLiveBanner(
-          `Live stress: ${Math.round(d.averageStress * 100)}% • updated just now`
-        );
+        const fmt = (val) => {
+          if (typeof val !== "number" || Number.isNaN(val)) return "0%";
+          // value is already a percent (0..100) coming from the store
+          return Number.isInteger(val) ? `${val}%` : `${val.toFixed(1)}%`;
+        };
+        setLiveBanner(`Live Stress: ${fmt(d.averageStress)} • updated just now`);
       }
     };
     window.addEventListener("stress-updated", onStressUpdated);
@@ -344,6 +353,127 @@ export default function ChatBot() {
         pushMessage("assistant", `Overdue tasks:\n${list}`);
       }
       return true;
+    }
+
+    // Which task contributes the most to my stress
+    if (/what is causing my highest stress|which task contributes the most to my stress|which task contributes the most/i.test(t)) {
+      const top = getMostStressfulTasks ? getMostStressfulTasks(1) : [];
+      if (!top.length) {
+        pushMessage("assistant", "I can't find any tasks contributing to stress right now.");
+      } else {
+        const s = top[0];
+        pushMessage(
+          "assistant",
+          `Your top stressor is "${s.title}" — contributing about ${Math.round((s.stress || 0) * 100)}% to its own stress rating.`
+        );
+      }
+      return true;
+    }
+
+    // How can I lower my stress this week? (recommendations)
+    if (/how can i lower my stress this week|how to lower my stress this week|how can i reduce my stress this week/i.test(t)) {
+      const daily = getDailyStressSummary();
+      const recs = generateAIRecommendations ? generateAIRecommendations(tasks, { total: daily.total, normalized: daily.average }) : [];
+      if (recs && recs.length) {
+        pushMessage("assistant", `Try these to reduce stress this week:\n- ${recs.slice(0,3).join('\n- ')}`);
+      } else {
+        pushMessage("assistant", "Focus on the top 1–2 highest-stress tasks and take a short break between blocks.");
+      }
+      return true;
+    }
+
+    // Is my stress higher than last week?
+    if (/is my stress higher than last week|higher than last week|compare to last week/i.test(t)) {
+      try {
+        const thisRange = parseTimeRange('this week');
+        const lastRange = parseTimeRange('last week');
+        const thisSummary = thisRange ? summarizeTasksInRange(tasks, thisRange) : null;
+        const lastSummary = lastRange ? summarizeTasksInRange(tasks, lastRange) : null;
+        const thisPct = thisSummary ? Number(thisSummary.daily.percent || 0) : getDailyStressSummary().percent;
+        const lastPct = lastSummary ? Number(lastSummary.daily.percent || 0) : 0;
+        if (!lastSummary) {
+          pushMessage('assistant', `This week: ${Math.round(thisPct)}%. No data for last week to compare.`);
+        } else {
+          const diff = Math.round(thisPct - lastPct);
+          const trend = diff > 0 ? `higher by ${diff}%` : diff < 0 ? `lower by ${Math.abs(diff)}%` : 'about the same as';
+          pushMessage('assistant', `This week's stress is ${trend} compared to last week (${Math.round(thisPct)}% vs ${Math.round(lastPct)}%).`);
+        }
+      } catch {
+        pushMessage('assistant', "I couldn't compare weeks right now.");
+      }
+      return true;
+    }
+
+    // What's my current total stress percentage?
+    if (/what's my current total stress percentage|what is my current total stress|current total stress|current stress percentage/i.test(t)) {
+      const s = getDailyStressSummary();
+      pushMessage('assistant', `Your current total stress: ${Number(s.percent).toFixed(s.percent % 1 === 0 ? 0 : 1)}% (based on ${s.count} active tasks).`);
+      return true;
+    }
+
+    // How many tasks are overdue?
+    if (/how many tasks are overdue|number of overdue tasks|how many overdue/i.test(t)) {
+      const now = new Date();
+      const overdue = tasks.filter((x) => !x.completed && x.due_date && new Date(x.due_date) < now);
+      pushMessage('assistant', `You have ${overdue.length} overdue task${overdue.length !== 1 ? 's' : ''}.`);
+      return true;
+    }
+
+    // Which task has the closest deadline?
+    if (/closest deadline|closest due date|which is due next|what's due next/i.test(t)) {
+      const upcoming = tasks
+        .filter(t => t.due_date && !t.completed)
+        .map(t => ({ ...t, dueMs: new Date(t.due_date).getTime() }))
+        .filter(t => !Number.isNaN(t.dueMs))
+        .sort((a,b) => a.dueMs - b.dueMs);
+      if (!upcoming.length) {
+        pushMessage('assistant', 'You have no upcoming tasks with deadlines.');
+      } else {
+        const next = upcoming[0];
+        pushMessage('assistant', `Next deadline: "${next.title}" due ${dayjs(next.due_date).fromNow()} (${dayjs(next.due_date).format('MMM DD')}).`);
+      }
+      return true;
+    }
+
+    // How many tasks this week / most stressful task today / missing / in progress / completed today / tasks in month
+    if (/how many tasks do i have this week|tasks this week|most stressful task today|most stressful today|which tasks are marked as missing|which tasks are missing|what tasks are still in progress|do i have any completed tasks today|how many total tasks do i have in/i.test(t)) {
+      // reuse earlier time parsing where possible
+      // most stressful task today
+      if (/most stressful task today|most stressful today/i.test(t)) {
+        const todayRange = parseTimeRange('today');
+        const summary = summarizeTasksInRange(tasks, todayRange) || { tasks: [] };
+        const active = summary.tasks.filter(x => !x.completed);
+        if (!active.length) {
+          pushMessage('assistant', "No active tasks today.");
+        } else {
+          const top = active.sort((a,b)=> (b.stress||0) - (a.stress||0))[0];
+          pushMessage('assistant', `Today's most stressful task: "${top.title}" — ${Math.round((top.stress||0)*100)}%.`);
+        }
+        return true;
+      }
+
+      if (/which tasks are marked as missing|which tasks are missing/i.test(t)) {
+        const missing = tasks.filter(x=> x.status === 'missing');
+        if (!missing.length) pushMessage('assistant', 'You have no tasks marked as missing.');
+        else pushMessage('assistant', `Missing tasks:\n${missing.map((m,i)=>`${i+1}. ${m.title}`).join('\n')}`);
+        return true;
+      }
+
+      if (/what tasks are still in progress|which tasks are still in progress|in progress tasks/i.test(t)) {
+        const inProg = tasks.filter(x=> x.status === 'in_progress');
+        if (!inProg.length) pushMessage('assistant', 'No tasks currently in progress.');
+        else pushMessage('assistant', `In progress tasks:\n${inProg.map((m,i)=>`${i+1}. ${m.title}`).join('\n')}`);
+        return true;
+      }
+
+      if (/do i have any completed tasks today|completed tasks today|any completed today/i.test(t)) {
+        const todayRange = parseTimeRange('today');
+        const summary = summarizeTasksInRange(tasks, todayRange) || { completed: 0 };
+        pushMessage('assistant', `You have ${summary.completed} completed task${summary.completed !== 1 ? 's' : ''} today.`);
+        return true;
+      }
+
+      // fallback to month/year queries handled by timeMatch earlier
     }
 
     if (/most stress|top stressors|causing me the most stress/i.test(t)) {
