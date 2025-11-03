@@ -9,6 +9,7 @@ import WorkloadVsStress from "../../components/analytics/WorkloadVsStress";
 import StressorPie from "../../components/analytics/StressorPie";
 import PredictiveTrend from "../../components/analytics/PredictiveTrend";
 import DepartmentPie from "../../components/analytics/DepartmentPie";
+import { fetchStudentsByDepartment } from "../../api/admin";
 
 import { buildPeriods, toDate, fmtYMD, addDays } from "../../utils/dateHelpers";
 import { taskDateYMD } from "../../utils/analyticsData";
@@ -231,16 +232,31 @@ export default function AdminHomepage() {
     };
   }, [tasks]);
 
-  /* ---------- department pie (unchanged logic) ---------- */
-  const deptData = useMemo(() => {
-    const counts = {};
-    (tasks || []).forEach((t) => {
-      // if your tasks have a department/user link, adapt accordingly; keeping generic
-      const d = t?.assignee_department || t?.department || "Unknown";
-      counts[d] = (counts[d] || 0) + 1;
-    });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [tasks]);
+  /* ---------- department pie data ---------- */
+  const [deptData, setDeptData] = useState([]);
+
+  useEffect(() => {
+    const fetchDeptData = async () => {
+      try {
+        const data = await fetchStudentsByDepartment();
+        if (data?.labels && data?.datasets?.[0]?.data) {
+          setDeptData(
+            data.labels.map((label, index) => ({
+              name: label,
+              value: data.datasets[0].data[index]
+            }))
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching department data:', error);
+      }
+    };
+
+    fetchDeptData();
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchDeptData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   /* ---------- UI (MATCHES Analytics page; header has NO icon buttons) ---------- */
   return (

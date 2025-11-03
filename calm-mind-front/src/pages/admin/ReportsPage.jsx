@@ -66,6 +66,10 @@ export default function ReportsPage() {
                       yearLevel: p.yearLevel || "",
                       studentNumber: p.studentNumber || "",
                       fullName: p.fullName || [p.firstName, p.lastName].filter(Boolean).join(" "),
+                      // new: include live stress percentage/level provided by backend
+                      stressPercentage: p.stressPercentage ?? p.stressLevel ?? null,
+                      stressLevel: p.stressLevel ?? null,
+                      stressMetrics: p.stressMetrics || null,
                     },
                   ];
                 })
@@ -107,10 +111,10 @@ export default function ReportsPage() {
 
     const s = range.start, e = range.end;
 
-    const r = [];
-    usersMap.forEach((u, uid) => {
+  const r = [];
+  usersMap.forEach((u, uid) => {
       const name = u?.name || [u?.firstName, u?.lastName].filter(Boolean).join(" ");
-      const prof = profilesMap.get(uid) || {};
+  const prof = profilesMap.get(String(uid)) || {};
       const department = prof.department || u?.department || u?.profile?.department || "";
       const level = prof.yearLevel || u?.level || u?.profile?.level || u?.yearLevel || "";
       const studentId = prof.studentNumber || u?.studentId || u?.id || u?._id || uid;
@@ -150,14 +154,28 @@ export default function ReportsPage() {
         const d = toDate(sl?.ts || sl?.date);
         return d >= s && d <= e;
       });
-      const totalStress = ustress.reduce((sum, sl) => sum + (Number(sl?.level) || 0), 0);
+      const computedTotalStress = ustress.reduce((sum, sl) => sum + (Number(sl?.level) || 0), 0);
       const totalTasks = utasks.length;
 
-      r.push({ studentId, name, level, department, totalTasks, totalStress, onTimeRate, overdueRate });
+      // Prefer live stress percentage from profile when available
+      // If only `stressLevel` (normalized 1-5) is present, convert to percentage
+      let liveStressPct = null;
+      if (prof?.stressPercentage != null && Number(prof.stressPercentage) > 0) {
+        liveStressPct = Number(prof.stressPercentage);
+      } else if (prof?.stressLevel != null && Number(prof.stressLevel) > 0) {
+        // convert normalized 1-5 to percentage 0-100
+        const nl = Number(prof.stressLevel);
+        liveStressPct = ((nl - 1) / 4) * 100;
+      }
+
+      const totalStressValue = liveStressPct != null ? liveStressPct : computedTotalStress;
+      const totalStressDisplay = liveStressPct != null ? `${Math.round(liveStressPct)}%` : String(totalStressValue || 0);
+
+      r.push({ studentId, name, level, department, totalTasks, totalStress: totalStressValue, totalStressDisplay, onTimeRate, overdueRate });
     });
 
     return r;
-  }, [users, tasks, stressLogs, range.start, range.end]);
+  }, [users, tasks, stressLogs, range.start, range.end, profilesMap]);
 
   /* ---------- export (unchanged logic) ---------- */
   const onExport = () => {
@@ -172,7 +190,8 @@ export default function ReportsPage() {
         r.level || "",
         (r.department || "").toString().replaceAll(",", " "),
         r.totalTasks ?? 0,
-        r.totalStress ?? 0,
+        // use formatted display so CSV matches UI (e.g. "42%" or numeric fallback)
+        (r.totalStressDisplay ?? String(r.totalStress ?? 0)).toString().replaceAll(",", " "),
         (r.onTimeRate ?? 0) + "%",
         (r.overdueRate ?? 0) + "%",
       ].join(",");
@@ -322,7 +341,7 @@ export default function ReportsPage() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.level}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.department}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.totalTasks}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.totalStress}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.totalStressDisplay ?? (r.totalStress != null ? `${Math.round(r.totalStress)}%` : 0)}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.onTimeRate}%</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.overdueRate}%</td>
                           </tr>
